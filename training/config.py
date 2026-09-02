@@ -38,14 +38,14 @@ PHASE1_BATCH    = 16
 # ─── Training — Phase 2 (full fine-tune) ──────────────────────────────────────
 PHASE2_EPOCHS   = 30
 PHASE2_LR_BACKBONE  = 1e-5     # low LR for pretrained weights
-PHASE2_LR_FREQ      = 5e-4
-PHASE2_LR_FUSION    = 1e-3
+PHASE2_LR_FREQ      = 2.5e-4
+PHASE2_LR_FUSION    = 5e-4
 PHASE2_BATCH    = 16
 
 # ─── Common Training ─────────────────────────────────────────────────────────
 WEIGHT_DECAY    = 1e-4
 GRAD_CLIP       = 1.0
-EARLY_STOP_PATIENCE = 7
+EARLY_STOP_PATIENCE = 10
 
 # ─── Focal Loss ───────────────────────────────────────────────────────────────
 FOCAL_ALPHA     = 0.25

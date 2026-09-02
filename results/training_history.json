@@ -2,171 +2,301 @@
   {
     "phase": "Phase 1 \u2014 Backbone Frozen",
     "epoch": 1,
-    "train_loss": 0.0479,
-    "train_acc": 0.6056,
-    "val_loss": 0.0972,
+    "train_loss": 0.0468,
+    "train_acc": 0.6298,
+    "val_loss": 0.105,
     "val_acc": 0.5057,
     "lr": 0.0005,
-    "time_s": 62.4
+    "time_s": 16.3
   },
   {
     "phase": "Phase 1 \u2014 Backbone Frozen",
     "epoch": 2,
-    "train_loss": 0.0396,
-    "train_acc": 0.6651,
-    "val_loss": 0.0696,
-    "val_acc": 0.5057,
+    "train_loss": 0.0375,
+    "train_acc": 0.6967,
+    "val_loss": 0.0417,
+    "val_acc": 0.517,
     "lr": 0.001,
-    "time_s": 94.3
+    "time_s": 15.1
   },
   {
     "phase": "Phase 1 \u2014 Backbone Frozen",
     "epoch": 3,
-    "train_loss": 0.0323,
-    "train_acc": 0.7306,
-    "val_loss": 0.461,
+    "train_loss": 0.034,
+    "train_acc": 0.7298,
+    "val_loss": 0.4843,
     "val_acc": 0.5057,
     "lr": 0.0008535533905932737,
-    "time_s": 83.4
+    "time_s": 15.1
   },
   {
     "phase": "Phase 1 \u2014 Backbone Frozen",
     "epoch": 4,
-    "train_loss": 0.03,
-    "train_acc": 0.7837,
-    "val_loss": 0.1978,
-    "val_acc": 0.6004,
+    "train_loss": 0.0279,
+    "train_acc": 0.8349,
+    "val_loss": 0.5085,
+    "val_acc": 0.5057,
     "lr": 0.0005,
-    "time_s": 53.0
+    "time_s": 15.2
   },
   {
     "phase": "Phase 1 \u2014 Backbone Frozen",
     "epoch": 5,
-    "train_loss": 0.0293,
-    "train_acc": 0.7923,
-    "val_loss": 0.1153,
+    "train_loss": 0.0257,
+    "train_acc": 0.8323,
+    "val_loss": 0.5345,
     "val_acc": 0.5057,
     "lr": 0.00014644660940672628,
-    "time_s": 51.0
+    "time_s": 15.1
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 1,
-    "train_loss": 0.0228,
-    "train_acc": 0.8589,
-    "val_loss": 0.1089,
-    "val_acc": 0.5057,
+    "train_loss": 0.0234,
+    "train_acc": 0.8592,
+    "val_loss": 0.2659,
+    "val_acc": 0.6326,
     "lr": 9.045084971874738e-06,
-    "time_s": 130.2
+    "time_s": 26.9
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 2,
-    "train_loss": 0.0212,
-    "train_acc": 0.8571,
-    "val_loss": 0.1253,
-    "val_acc": 0.6761,
+    "train_loss": 0.0204,
+    "train_acc": 0.8776,
+    "val_loss": 0.2821,
+    "val_acc": 0.5057,
     "lr": 6.545084971874738e-06,
-    "time_s": 129.3
+    "time_s": 27.0
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 3,
-    "train_loss": 0.0196,
-    "train_acc": 0.8704,
-    "val_loss": 0.4793,
-    "val_acc": 0.6004,
+    "train_loss": 0.0185,
+    "train_acc": 0.8808,
+    "val_loss": 0.1019,
+    "val_acc": 0.5057,
     "lr": 3.4549150281252635e-06,
-    "time_s": 130.7
+    "time_s": 27.0
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 4,
-    "train_loss": 0.0157,
-    "train_acc": 0.9046,
-    "val_loss": 0.0235,
-    "val_acc": 0.8352,
+    "train_loss": 0.0186,
+    "train_acc": 0.8891,
+    "val_loss": 0.0949,
+    "val_acc": 0.5057,
     "lr": 9.549150281252633e-07,
-    "time_s": 129.4
+    "time_s": 26.7
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 5,
-    "train_loss": 0.0154,
-    "train_acc": 0.8997,
-    "val_loss": 0.0211,
-    "val_acc": 0.8523,
+    "train_loss": 0.0178,
+    "train_acc": 0.884,
+    "val_loss": 0.0771,
+    "val_acc": 0.733,
     "lr": 1e-05,
-    "time_s": 66.2
+    "time_s": 26.9
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 6,
-    "train_loss": 0.0175,
-    "train_acc": 0.9125,
-    "val_loss": 0.3941,
-    "val_acc": 0.6004,
+    "train_loss": 0.0163,
+    "train_acc": 0.9043,
+    "val_loss": 0.0356,
+    "val_acc": 0.8144,
     "lr": 9.755282581475769e-06,
-    "time_s": 87.2
+    "time_s": 26.8
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 7,
-    "train_loss": 0.0143,
-    "train_acc": 0.9074,
-    "val_loss": 2.0004,
-    "val_acc": 0.5833,
+    "train_loss": 0.0153,
+    "train_acc": 0.9108,
+    "val_loss": 0.2627,
+    "val_acc": 0.5057,
     "lr": 9.045084971874738e-06,
-    "time_s": 87.0
+    "time_s": 26.9
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 8,
-    "train_loss": 0.0134,
-    "train_acc": 0.9324,
-    "val_loss": 0.2521,
+    "train_loss": 0.0152,
+    "train_acc": 0.9127,
+    "val_loss": 0.305,
     "val_acc": 0.5057,
     "lr": 7.938926261462366e-06,
-    "time_s": 87.4
+    "time_s": 26.8
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 9,
-    "train_loss": 0.0128,
-    "train_acc": 0.9298,
-    "val_loss": 0.0887,
-    "val_acc": 0.7879,
+    "train_loss": 0.0152,
+    "train_acc": 0.8987,
+    "val_loss": 2.8064,
+    "val_acc": 0.5663,
     "lr": 6.545084971874738e-06,
-    "time_s": 87.4
+    "time_s": 26.6
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 10,
-    "train_loss": 0.01,
-    "train_acc": 0.9452,
-    "val_loss": 1.1322,
+    "train_loss": 0.0099,
+    "train_acc": 0.9503,
+    "val_loss": 0.5515,
     "val_acc": 0.5057,
     "lr": 5e-06,
-    "time_s": 90.2
+    "time_s": 26.9
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 11,
-    "train_loss": 0.0071,
-    "train_acc": 0.9592,
-    "val_loss": 0.5883,
-    "val_acc": 0.5057,
+    "train_loss": 0.0095,
+    "train_acc": 0.9433,
+    "val_loss": 0.1013,
+    "val_acc": 0.517,
     "lr": 3.4549150281252635e-06,
-    "time_s": 88.5
+    "time_s": 26.8
   },
   {
     "phase": "Phase 2 \u2014 Full Fine-Tune",
     "epoch": 12,
-    "train_loss": 0.008,
-    "train_acc": 0.9584,
-    "val_loss": 0.0623,
-    "val_acc": 0.7822,
+    "train_loss": 0.0086,
+    "train_acc": 0.9599,
+    "val_loss": 0.062,
+    "val_acc": 0.5909,
     "lr": 2.061073738537635e-06,
-    "time_s": 87.9
+    "time_s": 26.5
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 13,
+    "train_loss": 0.0093,
+    "train_acc": 0.9484,
+    "val_loss": 0.1949,
+    "val_acc": 0.5057,
+    "lr": 9.549150281252633e-07,
+    "time_s": 26.8
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 14,
+    "train_loss": 0.0084,
+    "train_acc": 0.9554,
+    "val_loss": 0.14,
+    "val_acc": 0.7443,
+    "lr": 2.447174185242324e-07,
+    "time_s": 26.9
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 15,
+    "train_loss": 0.0068,
+    "train_acc": 0.9656,
+    "val_loss": 0.0166,
+    "val_acc": 0.9148,
+    "lr": 1e-05,
+    "time_s": 26.7
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 16,
+    "train_loss": 0.0082,
+    "train_acc": 0.9529,
+    "val_loss": 0.3923,
+    "val_acc": 0.5057,
+    "lr": 9.938441702975689e-06,
+    "time_s": 27.0
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 17,
+    "train_loss": 0.0097,
+    "train_acc": 0.9356,
+    "val_loss": 4.0974,
+    "val_acc": 0.5833,
+    "lr": 9.755282581475769e-06,
+    "time_s": 29.7
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 18,
+    "train_loss": 0.006,
+    "train_acc": 0.9707,
+    "val_loss": 0.0544,
+    "val_acc": 0.8258,
+    "lr": 9.45503262094184e-06,
+    "time_s": 29.8
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 19,
+    "train_loss": 0.007,
+    "train_acc": 0.9624,
+    "val_loss": 0.0902,
+    "val_acc": 0.5795,
+    "lr": 9.045084971874738e-06,
+    "time_s": 30.3
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 20,
+    "train_loss": 0.0063,
+    "train_acc": 0.9675,
+    "val_loss": 0.3572,
+    "val_acc": 0.5057,
+    "lr": 8.535533905932739e-06,
+    "time_s": 30.5
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 21,
+    "train_loss": 0.0068,
+    "train_acc": 0.9643,
+    "val_loss": 0.0332,
+    "val_acc": 0.7557,
+    "lr": 7.938926261462366e-06,
+    "time_s": 31.0
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 22,
+    "train_loss": 0.0055,
+    "train_acc": 0.9617,
+    "val_loss": 1.7099,
+    "val_acc": 0.5947,
+    "lr": 7.269952498697734e-06,
+    "time_s": 30.5
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 23,
+    "train_loss": 0.0054,
+    "train_acc": 0.9783,
+    "val_loss": 0.3632,
+    "val_acc": 0.6723,
+    "lr": 6.545084971874738e-06,
+    "time_s": 31.0
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 24,
+    "train_loss": 0.0047,
+    "train_acc": 0.9783,
+    "val_loss": 5.2431,
+    "val_acc": 0.5777,
+    "lr": 5.782172325201155e-06,
+    "time_s": 30.9
+  },
+  {
+    "phase": "Phase 2 \u2014 Full Fine-Tune",
+    "epoch": 25,
+    "train_loss": 0.0037,
+    "train_acc": 0.9816,
+    "val_loss": 0.3835,
+    "val_acc": 0.5057,
+    "lr": 5e-06,
+    "time_s": 31.2
   }
 ]
