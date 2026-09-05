@@ -56,6 +56,9 @@ REGIONS = {
    "aadhaar_num": (0.170, 0.740, 0.720, 0.840)
 }
 
+# Header region for targeted Hindi/English header OCR (x_min, y_min, x_max, y_max)
+HEADER_REGION = (0.150, 0.000, 1.000, 0.150)
+
 # ─── Text Rendering ───────────────────────────────────────────────────────────
 # Font sizes as fraction of card HEIGHT — tuned to match real card typography
 FONT_SIZE_NAME     = 0.050   # Name value  (≈34 px on 680 h card)
