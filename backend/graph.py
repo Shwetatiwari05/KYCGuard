@@ -15,6 +15,7 @@ from fusion.risk_engine import fuse
 from training.config import CHECKPOINT_DIR
 from training.model import DualBranchForgeryDetector
 from src.ocr.ocr_engine import OCREngine
+from src.ocr.mistral_engine import MistralOCREngine
 from src.validation import (
     aadhaar_validator,
     layout_validator,
@@ -22,6 +23,8 @@ from src.validation import (
 )
 
 GROQ_MODEL = "openai/gpt-oss-20b"
+
+OCR_FALLBACK_CONFIDENCE_THRESHOLD = 0.75
 
 # ── Model (loaded once at import / startup) ─────────────────────────────────
 _device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
@@ -51,6 +54,7 @@ class GraphState(TypedDict):
     freq: torch.Tensor
     visual_risk_score: float | None
     ocr_confidence: float | None
+    ocr_source: str | None
     ocr_quality_warning: str | None
     ocr_results: list[dict] | None
     extracted_text: str | None
@@ -86,12 +90,28 @@ def run_ocr(state: GraphState) -> GraphState:
 
     all_text = " ".join(r["text"] for r in results)
     sample = all_text[:500]
+    ocr_source = "easyocr"
+
+    if avg_conf < OCR_FALLBACK_CONFIDENCE_THRESHOLD:
+        try:
+            with MistralOCREngine() as mistral:
+                mistral_text, mistral_conf = mistral.run(arr)
+            if mistral_text and mistral_text.strip():
+                all_text = mistral_text.replace("\n", " ").strip()
+                sample = all_text[:500]
+                avg_conf = max(avg_conf, mistral_conf)
+                warning = None
+                ocr_source = "mistral_fallback"
+        except Exception:
+            pass
+
     return {
         "ocr_results": results,
         "extracted_text": all_text,
         "extracted_text_sample": sample,
         "ocr_confidence": avg_conf,
         "ocr_quality_warning": warning,
+        "ocr_source": ocr_source,
     }
 
 

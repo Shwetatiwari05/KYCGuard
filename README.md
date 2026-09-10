@@ -1,4 +1,4 @@
-# FinShield AI — Model 1: KYC Document Forgery Detector
+# KYCGuard AI — Model 1: KYC Document Forgery Detector
 
 > **An end-to-end deep learning pipeline for detecting fake KYC documents (Aadhaar & PAN cards) in digital banking systems.**
 
@@ -22,7 +22,7 @@
 
 ## Overview
 
-FinShield AI Model 1 is a research-grade fraud detection system built to identify forged Indian KYC documents — specifically Aadhaar and PAN cards — as they appear in digital onboarding flows.
+KYCGuard AI Model 1 is a research-grade fraud detection system built to identify forged Indian KYC documents — specifically Aadhaar and PAN cards — as they appear in digital onboarding flows.
 
 The system combines:
 1. **A synthetic dataset generation engine** that produces realistic real and forged document images using DeepFace-powered face analysis, procedural composition, and multi-category tampering simulation.
@@ -446,4 +446,4 @@ python verify_checkpoint.py
 
 ---
 
-*FinShield AI Model 1 — Built for robust KYC fraud detection in digital banking.*
+*KYCGuard AI Model 1 — Built for robust KYC fraud detection in digital banking.*

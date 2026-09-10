@@ -7,14 +7,15 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
+load_dotenv()
+load_dotenv("backend/.env")
+
 from training.config import IMAGENET_MEAN, IMAGENET_STD, IMG_SIZE
 from training.dct_utils import compute_dct
 
 from backend.graph import graph
 
-load_dotenv()
-
-app = FastAPI(title="FinShield — KYC Forgery Detection")
+app = FastAPI(title="KYCGuard — KYC Forgery Detection")
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,6 +70,7 @@ async def predict(
             "freq": freq,
             "visual_risk_score": None,
             "ocr_confidence": None,
+            "ocr_source": None,
             "ocr_quality_warning": None,
             "ocr_results": None,
             "extracted_text": None,
@@ -94,6 +96,7 @@ async def predict(
         },
         "ocr": {
             "confidence": round(result["ocr_confidence"], 4) if result["ocr_confidence"] is not None else None,
+            "source": result.get("ocr_source"),
             "quality_warning": result.get("ocr_quality_warning"),
             "extracted_text_sample": result.get("extracted_text_sample", ""),
         },

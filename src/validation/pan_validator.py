@@ -13,14 +13,18 @@ PAN_EXPECTED_STRINGS = [
 ]
 
 FUZZY_THRESHOLD = 88
-PAN_NUM_RE = re.compile(r"(?<![A-Z0-9])[A-Z]{5}[0-9]{4}[A-Z](?![A-Z0-9])")
+PAN_NUM_RE = re.compile(r"(?<![A-Za-z0-9])[A-Z]{5}[0-9]{4}[A-Z](?![A-Za-z0-9])")
+PAN_NUM_RE_STRICT = re.compile(r"(?:^|[^A-Za-z0-9])([A-Z]{5}[0-9]{4}[A-Z])(?=[^A-Za-z0-9]|$)")
 
 
 def _extract_pan_number(text: str) -> str | None:
-    clean = re.sub(r"[\s\-]", "", text)
-    m = PAN_NUM_RE.search(clean)
+    m = PAN_NUM_RE.search(text)
     if m:
         return m.group(0)
+    clean = re.sub(r"[\s\-]", "", text)
+    m = PAN_NUM_RE_STRICT.search(clean)
+    if m:
+        return m.group(1)
     return None
 
 

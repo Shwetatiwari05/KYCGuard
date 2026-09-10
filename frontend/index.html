@@ -3,460 +3,120 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FinShield — KYC Forgery Detection</title>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --border: #334155;
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-      --low: #22c55e;
-      --medium: #f59e0b;
-      --high: #ef4444;
-      --neutral: #64748b;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 2rem 1rem;
-    }
-    .container { max-width: 680px; margin: 0 auto; }
-    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-    .subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 1.75rem; }
-
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .doc-type-row {
-      display: flex;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
-    }
-    .doc-type-row label {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      font-size: 0.95rem;
-      cursor: pointer;
-    }
-
-    .upload-area {
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      margin-bottom: 1rem;
-    }
-    .upload-area:hover { border-color: var(--accent); background: #0b1220; }
-    .upload-area input { display: none; }
-    .upload-area p { color: var(--muted); font-size: 0.875rem; margin-top: 0.5rem; }
-
-    .input-tabs {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 0.75rem;
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 0.6rem;
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .tab-btn.active {
-      background: var(--accent);
-      color: #04293a;
-      border-color: var(--accent);
-      font-weight: 600;
-    }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-    .filename { color: var(--accent); font-size: 0.875rem; margin-bottom: 1rem; min-height: 1.2em; }
-
-    button {
-      width: 100%;
-      padding: 0.875rem;
-      background: var(--accent);
-      color: #04293a;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-    button:hover:not(:disabled) { opacity: 0.9; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .spinner {
-      display: none;
-      text-align: center;
-      color: var(--muted);
-      margin: 1.5rem 0;
-    }
-
-    .error {
-      color: var(--high);
-      font-size: 0.875rem;
-      margin-top: 1rem;
-      display: none;
-    }
-
-    .result { display: none; margin-top: 1.5rem; }
-
-    .signal-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-    }
-    @media (max-width: 480px) { .signal-grid { grid-template-columns: 1fr; } }
-
-    .signal-card {
-      background: #0f172a;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1rem;
-    }
-    .signal-card .signal-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-      margin-bottom: 0.4rem;
-    }
-    .signal-card .signal-status {
-      font-size: 0.95rem;
-      font-weight: 700;
-      margin-bottom: 0.25rem;
-    }
-    .signal-card .signal-score {
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-    .signal-card .checks {
-      margin-top: 0.5rem;
-      font-size: 0.8rem;
-      color: var(--high);
-      line-height: 1.4;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .badge.low { background: rgba(34,197,94,0.15); color: var(--low); border: 1px solid var(--low); }
-    .badge.medium { background: rgba(245,158,11,0.15); color: var(--medium); border: 1px solid var(--medium); }
-    .badge.high { background: rgba(239,68,68,0.15); color: var(--high); border: 1px solid var(--high); }
-    .badge.neutral { background: rgba(100,116,139,0.15); color: var(--neutral); border: 1px solid var(--neutral); }
-    .badge.approve { background: rgba(34,197,94,0.15); color: var(--low); border: 1px solid var(--low); }
-    .badge.review { background: rgba(245,158,11,0.15); color: var(--medium); border: 1px solid var(--medium); }
-    .badge.suspicious { background: rgba(239,68,68,0.15); color: var(--high); border: 1px solid var(--high); }
-
-    .final-decision {
-      margin-top: 1.25rem;
-      padding: 1.25rem;
-      background: #0f172a;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      text-align: center;
-    }
-    .final-decision .fd-label {
-      font-size: 0.8rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 0.3rem;
-    }
-    .final-decision .fd-score {
-      font-size: 2rem;
-      font-weight: 800;
-      margin-bottom: 0.4rem;
-    }
-    .final-decision .fd-reasons {
-      margin-top: 0.75rem;
-      text-align: left;
-      font-size: 0.85rem;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-    .final-decision .fd-reasons ul {
-      margin-left: 1.2rem;
-      margin-top: 0.3rem;
-    }
-    .final-decision .fd-reasons li {
-      margin-bottom: 0.2rem;
-    }
-
-    .ocr-section {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: #0f172a;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-    }
-    .ocr-section .ocr-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-      margin-bottom: 0.4rem;
-    }
-    .ocr-section .ocr-text {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.8rem;
-      color: var(--text);
-      line-height: 1.5;
-      max-height: 120px;
-      overflow-y: auto;
-    }
-
-    .explanation-box {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: rgba(245,158,11,0.08);
-      border: 1px solid var(--medium);
-      border-radius: 10px;
-      font-size: 0.9rem;
-      line-height: 1.5;
-      color: var(--text);
-    }
-
-    .ocr-warning {
-      margin-top: 1rem;
-      padding: 1rem;
-      background: rgba(245,158,11,0.1);
-      border: 1px solid var(--medium);
-      border-radius: 10px;
-      font-size: 0.9rem;
-      line-height: 1.5;
-      color: var(--text);
-    }
-    .ocr-warning.warning-icon {
-      font-size: 1.2rem;
-      margin-right: 0.4rem;
-    }
-  </style>
+  <title>KYCGuard — KYC Forgery Detection</title>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="container">
-    <h1>FinShield</h1>
-    <p class="subtitle">Multi-signal KYC document forgery detection</p>
-
-    <div class="card">
-      <div class="doc-type-row">
-        <label><input type="radio" name="doc_type" value="AADHAAR" checked /> Aadhaar</label>
-        <label><input type="radio" name="doc_type" value="PAN" /> PAN</label>
-      </div>
-
-      <div class="input-tabs">
-        <button type="button" class="tab-btn active" data-tab="upload">Upload a file</button>
-        <button type="button" class="tab-btn" data-tab="camera">Take a photo</button>
-      </div>
-
-      <div class="tab-panel active" id="panel-upload">
-        <label class="upload-area" for="file-input">
-          <div>Click to browse files</div>
-          <p>JPG, PNG supported</p>
-          <input type="file" id="file-input" accept="image/*" />
-        </label>
-      </div>
-
-      <div class="tab-panel" id="panel-camera">
-        <label class="upload-area" for="camera-input">
-          <div>Tap to open camera</div>
-          <p>Uses rear camera on mobile</p>
-          <input type="file" id="camera-input" accept="image/*" capture="environment" />
-        </label>
-      </div>
-
-      <div class="filename" id="filename"></div>
-      <button id="check-btn" disabled>Check Document</button>
-
-      <div class="spinner" id="spinner">Analyzing document…</div>
-      <div class="error" id="error"></div>
-
-      <div class="result" id="result">
-        <div class="signal-grid" id="signals"></div>
-
-        <div class="final-decision" id="final-decision"></div>
-
-        <div class="ocr-section" id="ocr-section">
-          <div class="ocr-label">OCR Extracted Text (sample)</div>
-          <div class="ocr-text" id="ocr-text"></div>
-        </div>
-
-      <div class="explanation-box" id="explanation-box" style="display:none;"></div>
-      <div class="ocr-warning" id="ocr-warning" style="display:none;"></div>
-    </div>
-    </div>
+  <!-- Animated background layers -->
+  <div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb--1"></div>
+    <div class="orb orb--2"></div>
+    <div class="orb orb--3"></div>
   </div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="scan-line scan-line--1" aria-hidden="true"></div>
+  <div class="scan-line scan-line--2" aria-hidden="true"></div>
+  <div class="bg-particles" aria-hidden="true">
+    <span class="particle" style="left: 6%; width: 3px; height: 3px; animation-duration: 11s; animation-delay: 0s;"></span>
+    <span class="particle" style="left: 14%; width: 2px; height: 2px; animation-duration: 9s; animation-delay: 1.2s;"></span>
+    <span class="particle" style="left: 22%; width: 4px; height: 4px; animation-duration: 13s; animation-delay: 2.6s;"></span>
+    <span class="particle" style="left: 32%; width: 3px; height: 3px; animation-duration: 10s; animation-delay: 0.8s;"></span>
+    <span class="particle" style="left: 42%; width: 2px; height: 2px; animation-duration: 12s; animation-delay: 3.4s;"></span>
+    <span class="particle" style="left: 51%; width: 3px; height: 3px; animation-duration: 9.5s; animation-delay: 1.8s;"></span>
+    <span class="particle" style="left: 60%; width: 4px; height: 4px; animation-duration: 14s; animation-delay: 0.4s;"></span>
+    <span class="particle" style="left: 68%; width: 2px; height: 2px; animation-duration: 10.5s; animation-delay: 2.2s;"></span>
+    <span class="particle" style="left: 76%; width: 3px; height: 3px; animation-duration: 12.5s; animation-delay: 3.8s;"></span>
+    <span class="particle" style="left: 85%; width: 2px; height: 2px; animation-duration: 9s; animation-delay: 1.5s;"></span>
+    <span class="particle" style="left: 92%; width: 4px; height: 4px; animation-duration: 11.5s; animation-delay: 0.6s;"></span>
+    <span class="particle" style="left: 38%; width: 2px; height: 2px; animation-duration: 13.5s; animation-delay: 2.9s;"></span>
+  </div>
+  <div class="bg-noise" aria-hidden="true"></div>
 
-  <script>
-    const fileInput = document.getElementById("file-input");
-    const cameraInput = document.getElementById("camera-input");
-    const filename = document.getElementById("filename");
-    const checkBtn = document.getElementById("check-btn");
-    const spinner = document.getElementById("spinner");
-    const error = document.getElementById("error");
-    const result = document.getElementById("result");
-    const signalsEl = document.getElementById("signals");
-    const finalEl = document.getElementById("final-decision");
-    const ocrText = document.getElementById("ocr-text");
-    const explanationBox = document.getElementById("explanation-box");
-    const ocrWarning = document.getElementById("ocr-warning");
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- 1. HERO SECTION -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-title-wrap">
+        <div class="hero-title-glow" aria-hidden="true"></div>
+        <h1 id="hero-title"><span class="logo-fin">KYC</span><span class="logo-shield">Guard</span></h1>
+      </div>
+      <div class="hero-sub-divider" aria-hidden="true"></div>
+      <p class="hero-subtitle">
+        AI-powered KYC document verification that goes beyond simple pass/fail.
+        KYCGuard combines <span class="hl">visual forensics</span>,
+        <span class="hl">OCR-based text validation</span>, and
+        <span class="hl">structural analysis</span> into one
+        <span class="hl">multi-signal risk assessment</span> — built for Aadhaar and
+        PAN card verification. Detect tampering, spelling errors, format anomalies,
+        and layout inconsistencies in a single scan.
+      </p>
+      <a href="demo.html" class="hero-cta">
+        <span>Try Demo</span>
+        <span class="hero-cta-arrow" aria-hidden="true">→</span>
+      </a>
+      <div class="hero-badges">
+        <span class="hero-badge"><i data-lucide="layers" aria-hidden="true"></i> 4 Independent Signals</span>
+        <span class="hero-badge"><i data-lucide="zap" aria-hidden="true"></i> Real-time Analysis</span>
+        <span class="hero-badge"><i data-lucide="scan-text" aria-hidden="true"></i> OCR + Visual Forensics</span>
+        <span class="hero-badge"><i data-lucide="shield-check" aria-hidden="true"></i> Format Validation</span>
+      </div>
+    </div>
+    <div class="scroll-indicator" id="scroll-indicator" role="button" tabindex="0" aria-label="Scroll to How It Works">
+      <span>Scroll to explore</span>
+      <div class="scroll-chevron"></div>
+    </div>
+  </section>
 
-    let activeFile = null;
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- 2. HOW IT WORKS -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="how-section" id="how-it-works">
+    <div class="section-label reveal">The Pipeline</div>
+    <h2 class="section-title reveal">How It Works</h2>
+    <p class="section-desc reveal">
+      Every document passes through four independent analysis layers. Each layer
+      catches different types of forgery — together they form a comprehensive
+      verification that no single check could achieve alone.
+    </p>
 
-    function statusClass(s) {
-      if (!s && s !== 0) return "neutral";
-      if (s < 0.3) return "low";
-      if (s < 0.6) return "medium";
-      return "high";
-    }
+    <div class="how-grid">
+      <div class="how-card reveal">
+        <i data-lucide="scan-eye" class="card-icon" aria-hidden="true"></i>
+        <h3>Visual Forensics</h3>
+        <p>Dual-branch CNN analyzes spatial and frequency-domain features to detect pixel-level manipulation, blur, noise, splicing, and affine warps.</p>
+      </div>
+      <div class="how-card reveal">
+        <i data-lucide="file-text" class="card-icon" aria-hidden="true"></i>
+        <h3>OCR / Text Consistency</h3>
+        <p>Extracts text and validates official headers, names, and dates against expected templates using fuzzy matching — catches spelling errors and swapped text.</p>
+      </div>
+      <div class="how-card reveal">
+        <i data-lucide="id-card" class="card-icon" aria-hidden="true"></i>
+        <h3>Document Structure</h3>
+        <p>Validates format compliance — Aadhaar number length, PAN regex pattern, and required field presence. Format-valid does not mean government-verified.</p>
+      </div>
+      <div class="how-card reveal">
+        <i data-lucide="layout-grid" class="card-icon" aria-hidden="true"></i>
+        <h3>Layout Consistency</h3>
+        <p>Checks that extracted text fields fall within calibrated template regions. Misplaced or missing fields trigger layout risk flags.</p>
+      </div>
+    </div>
+  </section>
 
-    function decisionBadge(d) {
-      if (d === "APPROVE") return "approve";
-      if (d === "REVIEW_REQUIRED") return "review";
-      return "suspicious";
-    }
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- 3. FOOTER -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <footer class="site-footer">
+    <span class="footer-logo" aria-label="KYCGuard"><span class="fin">KYC</span><span class="shield">Guard</span></span>
+    <p class="footer-note">Research prototype, not a production KYC verification system.</p>
+    <p class="footer-stack">Built with <span class="stack-pill">PyTorch</span>, <span class="stack-pill">FastAPI</span>, <span class="stack-pill">LangGraph</span>, and OCR-based document intelligence.</p>
+  </footer>
 
-    document.querySelectorAll(".tab-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-        document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-        btn.classList.add("active");
-        document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
-        activeFile = null;
-        filename.textContent = "";
-        checkBtn.disabled = true;
-      });
-    });
-
-    function onFileSelected(file) {
-      activeFile = file;
-      filename.textContent = file.name;
-      checkBtn.disabled = false;
-    }
-
-    fileInput.addEventListener("change", () => {
-      if (fileInput.files.length > 0) onFileSelected(fileInput.files[0]);
-    });
-
-    cameraInput.addEventListener("change", () => {
-      if (cameraInput.files.length > 0) onFileSelected(cameraInput.files[0]);
-    });
-
-    checkBtn.addEventListener("click", async () => {
-      const file = activeFile;
-      if (!file) return;
-
-      const docType = document.querySelector('input[name="doc_type"]:checked').value;
-
-      spinner.style.display = "block";
-      result.style.display = "none";
-      error.style.display = "none";
-      ocrWarning.style.display = "none";
-      checkBtn.disabled = true;
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("doc_type", docType);
-
-      try {
-        const res = await fetch("http://localhost:8000/predict", {
-          method: "POST",
-          body: formData,
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: res.statusText }));
-          throw new Error(err.detail || `Server error (${res.status})`);
-        }
-        const data = await res.json();
-
-        const sigs = [
-          { label: "Visual Forensics", score: data.visual_forensics.risk_score, status: data.visual_forensics.status, checks: [] },
-          { label: "OCR / Text Consistency", score: data.semantic_validation.risk_score, status: data.semantic_validation.risk_score === null ? "N/A" : (data.semantic_validation.risk_score === 0 ? "LOW_RISK" : "HIGH_RISK"), checks: data.semantic_validation.failed_checks },
-          { label: "Document Structure", score: data.structural_validation.risk_score, status: data.structural_validation.risk_score === 0 ? "VALID" : "INVALID", checks: data.structural_validation.failed_checks },
-          { label: "Layout Consistency", score: data.layout_validation.risk_score, status: data.layout_validation.risk_score === 0 ? "LOW_RISK" : "HIGH_RISK", checks: data.layout_validation.failed_checks },
-        ];
-
-        signalsEl.innerHTML = sigs.map(s => {
-          const sc = statusClass(s.score);
-          const displayScore = s.score !== null && s.score !== undefined ? (s.score * 100).toFixed(0) + "%" : "—";
-          const checksHtml = (s.checks && s.checks.length)
-            ? `<div class="checks">${s.checks.map(c => "• " + c).join("<br>")}</div>`
-            : "";
-          return `
-            <div class="signal-card">
-              <div class="signal-label">${s.label}</div>
-              <div class="signal-status"><span class="badge ${sc}">${s.status}</span></div>
-              <div class="signal-score">Score: ${displayScore}</div>
-              ${checksHtml}
-            </div>
-          `;
-        }).join("");
-
-        const fd = data.final_decision;
-        const reasons = [];
-        if (data.semantic_validation.failed_checks.length) reasons.push(...data.semantic_validation.failed_checks);
-        if (data.structural_validation.failed_checks.length) reasons.push(...data.structural_validation.failed_checks);
-        if (data.layout_validation.failed_checks.length) reasons.push(...data.layout_validation.failed_checks);
-        if (data.visual_forensics.status !== "LOW_RISK") reasons.push("Visual forensics detected potential manipulation");
-
-        finalEl.innerHTML = `
-          <div class="fd-label">Final Risk Assessment</div>
-          <div class="fd-score"><span class="badge ${statusClass(fd.risk_score)}">${fd.category}</span></div>
-          <div style="font-size:0.85rem;color:var(--muted)">Score: ${(fd.risk_score * 100).toFixed(1)}%</div>
-          <div style="margin-top:0.5rem"><span class="badge ${decisionBadge(fd.decision)}">${fd.decision.replace("_", " ")}</span></div>
-          ${reasons.length ? `<div class="fd-reasons"><strong>Reasons flagged:</strong><ul>${reasons.map(r => `<li>${r}</li>`).join("")}</ul></div>` : ""}
-        `;
-
-        ocrText.textContent = data.ocr.extracted_text_sample || "(no text extracted)";
-
-        if (data.ocr.quality_warning) {
-          ocrWarning.innerHTML = `<span class="warning-icon">Image quality is low — OCR results may be unreliable. Consider retaking the photo with better lighting and less glare.</span>`;
-          ocrWarning.style.display = "block";
-        } else {
-          ocrWarning.style.display = "none";
-        }
-
-        if (data.explanation) {
-          explanationBox.textContent = data.explanation;
-          explanationBox.style.display = "block";
-        } else {
-          explanationBox.style.display = "none";
-        }
-
-        result.style.display = "block";
-      } catch (e) {
-        error.textContent = "Error: " + e.message;
-        error.style.display = "block";
-      } finally {
-        spinner.style.display = "none";
-        checkBtn.disabled = false;
-      }
-    });
-  </script>
+  <script src="landing.js"></script>
 </body>
 </html>
