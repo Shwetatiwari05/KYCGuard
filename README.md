@@ -381,7 +381,6 @@ These are honest, code-verified constraints — not feature claims:
 4. **Known OCR erratums.** EasyOCR mis-reads of Devanagari/English headers (e.g. `भारत→भरत`, `INDIYA→INDIA`) are patched by specific normalisation rules, not handled generically.
 5. **LLM explanations are evidence-grounded but require an API key** and only run for flagged documents. They cite only the findings from the four signals; they never perform official verification.
 6. **Format-valid ≠ authentic.** Structural/layout checks verify syntax and placement, not provenance. A well-formed document can still be inauthentic, and validation here is not a substitute for government verification.
-7. **Not a production system.** No document storage, no audit trail, no rate limiting, no concurrency tuning; the model checkpoint is loaded into memory per worker and OCR is cold-started on first request.
 
 ---
 
@@ -443,6 +442,6 @@ These are honest, code-verified constraints — not feature claims:
 
 ---
 
-## Licence
+## License
 
-Not specified. Research prototype — see the disclaimer at the top of this document before using it for anything other than experimentation.
+MIT
