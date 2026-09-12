@@ -1,449 +1,448 @@
-# KYCGuard AI — Model 1: KYC Document Forgery Detector
+# KYCGuard AI — Multi-Signal KYC Document Risk Assessment
 
-> **An end-to-end deep learning pipeline for detecting fake KYC documents (Aadhaar & PAN cards) in digital banking systems.**
+> A research pipeline that flags potentially forged Indian KYC documents (Aadhaar & PAN) by combining **visual forensics, OCR + semantic validation, structural validation,** and **layout consistency** into a single fused risk score.
+
+> **⚠️ Research prototype — not a production KYC verification system.** This software does not verify identity and is not a substitute for official verification with government records. "Format-valid" here means the document matches expected syntax and layout heuristics — it does **not** mean the document is authentic or government-verified.
 
 ---
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Key Results](#key-results)
-- [Project Architecture](#project-architecture)
-- [Model Design](#model-design)
-- [Dataset Generation Pipelines](#dataset-generation-pipelines)
-- [Training Strategy](#training-strategy)
-- [Evaluation and Explainability](#evaluation-and-explainability)
-- [Project Structure](#project-structure)
-- [Setup and Installation](#setup-and-installation)
-- [Usage](#usage)
+- [What It Does](#what-it-does)
+- [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
+- [The Four Risk Signals](#the-four-risk-signals)
+- [Risk Fusion & Decisions](#risk-fusion--decisions)
+- [Model Details](#model-details)
+- [Evaluation](#evaluation)
+- [Dataset Generation](#dataset-generation)
+- [Setup & Installation](#setup--installation)
+- [Running the Backend](#running-the-backend)
+- [Running the Frontend](#running-the-frontend)
+- [API Reference](#api-reference)
+- [Known Limitations](#known-limitations)
+- [Project Structure](#project-structure)
 
 ---
 
-## Overview
+## What It Does
 
-KYCGuard AI Model 1 is a research-grade fraud detection system built to identify forged Indian KYC documents — specifically Aadhaar and PAN cards — as they appear in digital onboarding flows.
+KYCGuard analyses a scanned or phone-captured image of an Indian KYC document and produces a **risk assessment** instead of a naive pass/fail.
 
-The system combines:
-1. **A synthetic dataset generation engine** that produces realistic real and forged document images using DeepFace-powered face analysis, procedural composition, and multi-category tampering simulation.
-2. **A dual-branch neural network** that simultaneously analyses the visual (spatial) and frequency-domain (DCT) features of each document to classify it as `real (0)` or `fake (1)`.
-3. **Explainability via Grad-CAM** to visualize exactly which document regions the model focuses on during inference.
+For each document it runs **four independent signals**, each tuned to catch a different class of forgery:
 
----
+1. **Visual forensics** — a dual-branch CNN looks for pixel-level manipulation, compression artefacts, blur, noise, splicing and affine warps in both the spatial and the frequency (DCT) domain.
+2. **OCR + semantic validation** — extracts the document text and fuzzy-matches it against the official headers and expected content for the document type, catching swapped or misspelled content.
+3. **Structural validation** — checks the format of key identifiers (12-digit Aadhaar number, PAN `AAAAA9999A` pattern).
+4. **Layout consistency** — verifies that required fields are present *where they are supposed to be*, using calibrated template regions.
 
-## Key Results
+The four signal scores are fused with fixed weights into a single `final_risk_score`, which maps to a category (`LOW_RISK` / `MEDIUM_RISK` / `HIGH_RISK`) and a decision (`APPROVE` / `REVIEW_REQUIRED` / `SUSPICIOUS`). When a document is *not* approved, an LLM (Groq) writes a short plain-English explanation of *why*, grounded strictly in the evidence produced by the four signals.
 
-Evaluated on a held-out test set of **144 samples** (identity-aware split, zero face leakage):
-
-| Metric     | Score  |
-|------------|--------|
-| **Accuracy**   | 86.81% |
-| **Precision**  | 82.09% |
-| **Recall**     | 88.71% |
-| **F1 Score**   | 85.27% |
-| **AUC-ROC**    | **92.19%** |
-
-> The model achieves a **0.922 AUC-ROC**, meaning it reliably separates real from forged documents across all decision thresholds.
+The system is exposed through a FastAPI service (`POST /predict`) and a two-page vanilla-JS frontend: a landing page and a live demo tool with real webcam capture.
 
 ---
 
-## Project Architecture
+## Architecture
 
 ```
-fin_modal1/
-+-- src/                        # Dataset generation pipelines
-|   +-- pipeline.py             # Aadhaar card orchestrator
-|   +-- pan_pipeline.py         # PAN card orchestrator
-|   +-- card_composer.py        # Aadhaar card image compositor
-|   +-- pan_card_composer.py    # PAN card image compositor
-|   +-- augmentor.py            # Post-render forgery augmentations
-|   +-- face_analyzer.py        # DeepFace gender+age analysis
-|   +-- template_extractor.py   # Clean template extraction
-|   +-- data_utils.py           # Name/DOB/Aadhaar number generators
-|   +-- config.py               # Pipeline configuration
-+-- training/                   # Model training and evaluation
-|   +-- model.py                # DualBranchForgeryDetector architecture
-|   +-- train.py                # Two-phase training loop
-|   +-- evaluate.py             # Metrics + plots
-|   +-- dataset.py              # ForgeryDataset + identity-aware splitting
-|   +-- grad_cam.py             # Grad-CAM explainability
-|   +-- dct_utils.py            # DCT frequency feature computation
-|   +-- config.py               # Training hyperparameters
-+-- output/                     # Generated Aadhaar dataset + CSV
-+-- output_pan/                 # Generated PAN dataset + CSV
-+-- checkpoints/                # Saved model checkpoints
-+-- results/                    # Metrics, plots, confusion matrix
-+-- requirements.txt
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                            Frontend (vanilla JS)                            │
+│   Landing page (index.html)          Demo tool (demo.html)                  │
+│                                        ├─ Upload (file input)               │
+│                                        └─ Live webcam capture (getUserMedia │
+│                                           → canvas → JPEG blob → File)      │
+└──────────────────────────────────────────┬───────────────────────────────────┘
+                                           │  POST /predict
+                                           │  multipart: file + doc_type (AADHAAR|PAN)
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                         FastAPI backend (backend/main.py)                   │
+│                                POST /predict                                │
+└──────────────────────────────────────────┬───────────────────────────────────┘
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│            LangGraph pipeline (backend/graph.py)                            │
+│                                                                             │
+│   START                                                                     │
+│     └─▶ run_visual_model      dual-branch CNN (EfficientNet-B0 + DCT-CNN)   │
+│              │                → visual_risk_score (fake probability)        │
+│              ▼                                                              │
+│     └─▶ run_ocr               EasyOCR (en+hi, CPU, preprocess: deskew,      │
+│              │                CLAHE, denoise)                               │
+│              │                ─ if avg confidence < 0.75 ─▶ Mistral OCR API  │
+│              │                   fallback (ocr_source = "mistral_fallback") │
+│              ▼                                                              │
+│     └─▶ run_semantic_validation   fuzzy-match official headers vs OCR text  │
+│              │                    (Aadhaar: "GOVERNMENT OF INDIA",          │
+│              │                    "भारत सरकार"; PAN: "INCOME TAX DEPARTMENT",│
+│              │                    "GOVT. OF INDIA")                        │
+│              ▼                                                              │
+│     └─▶ run_structural_validation  Aadhaar 12-digit / PAN regex check       │
+│              ▼                                                              │
+│     └─▶ run_layout_validation      OCR bboxes vs calibrated template regions│
+│              ▼                                                              │
+│     └─▶ fuse_risk                    weighted sum → category + decision     │
+│              │                                                              │
+│              ├─ decision == APPROVE ──▶ report   (no explanation)          │
+│              │                                                              │
+│              └─ decision != APPROVE ─▶ explain  (Groq LLM, conditional on   │
+│                                          GROQ_API_KEY set)                  │
+│              │                                                              │
+│              ▼                                                              │
+│     END  ──▶ JSON response                                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
+
+The graph nodes run **sequentially** (visual → OCR → semantic → structural → layout → fuse), then a conditional edge routes to the LLM explanation or straight to the report.
 
 ---
 
-## Model Design
+## Tech Stack
 
-### Dual-Branch Forgery Detector
+Pulled from [`requirements.txt`](requirements.txt) and the actual imports:
 
-The core model (`DualBranchForgeryDetector`) is a custom dual-stream architecture that processes every document image through **two parallel branches** simultaneously, then fuses their representations:
+| Area | Technologies |
+|------|--------------|
+| **Dataset generation** | OpenCV, Pillow, NumPy, Pandas, tqdm, DeepFace (gender/age face analysis, via `tf-keras`), requests |
+| **Training** | PyTorch, torchvision, timm (EfficientNet-B0), SciPy (DCT), scikit-learn (metrics/splits), matplotlib, seaborn |
+| **Backend / orchestration** | FastAPI, uvicorn, python-multipart, LangGraph, langchain-groq, python-dotenv |
+| **OCR / validation** | EasyOCR (en + hi, CPU), rapidfuzz (fuzzy matching), httpx (Mistral OCR API fallback) |
+| **Frontend** | Vanilla HTML/CSS/JS + Lucide icons + Google Fonts (CDN) — no build step |
 
-```
-Input Image (224x224 RGB)
-        |
-        +-----------------------+
-        |                       |
-        v                       v
- [Spatial Branch]        [Frequency Branch]
- EfficientNet-B0         DCT-CNN (3-layer Conv2D)
- ImageNet pretrained     Trained from scratch
-        |                       |
-        v                       v
-  1280-d features          128-d features
-        |                       |
-        +-----------+-----------+
-                    |
-               concat -> 1408-d
-                    |
-            [Fusion Head]
-     Linear(1408->256) + BN + ReLU + Dropout(0.4)
-     Linear(256->64)   + BN + ReLU + Dropout(0.4)
-     Linear(64->2)
-                    |
-               Logits [Real, Fake]
-```
+Optional runtime keys (loaded from `.env` / `backend/.env`):
 
-**Why two branches?**
-- The **spatial branch** learns visual forgery artifacts: inconsistent fonts, misaligned face regions, unnatural textures.
-- The **frequency branch** learns high-frequency DCT anomalies: JPEG re-compression artifacts, copy-paste traces, and GAN synthesis fingerprints that are invisible to the naked eye but detectable as DCT coefficient discontinuities.
+- `GROQ_API_KEY` — enables the LLM explanation layer (`openai/gpt-oss-20b`). Without it, `explanation` is returned as `"Explanation unavailable: GROQ_API_KEY not set."`
+- `MISTRAL_API_KEY` — optional; enables the Mistral OCR fallback when EasyOCR confidence is low. OCR works fine without it.
 
 ---
 
-### Spatial Branch (EfficientNet-B0)
+## The Four Risk Signals
 
-- **Backbone**: `timm` EfficientNet-B0, pretrained on ImageNet.
-- **Classifier head removed** (`num_classes=0`, `global_pool="avg"`).
-- **Output**: 1280-dimensional feature vector per image.
-- Weights **frozen in Phase 1**, **fine-tuned at LR=1e-5** in Phase 2 to preserve ImageNet representations.
+### 1. Visual forensics (`run_visual_model`)
+- A dual-branch CNN classifies the document as real/fake and reports the **probability of "fake"** as `visual_risk_score`.
+- **Spatial branch:** EfficientNet-B0 (ImageNet-pretrained, pooled to 1280-d features).
+- **Frequency branch:** 3-layer DCT-CNN (32→64→128 channels) operating on log-scaled, normalised 2-D DCT coefficients — designed to surface compression/artefact fingerprints that can be subtle in pixel space.
+- Both branches feed a learned fusion head.
+- Regions the model leans on can be inspected with Grad-CAM (`training/grad_cam.py`).
+
+### 2. OCR + semantic validation (`run_ocr` → `run_semantic_validation`)
+- EasyOCR (`["en", "hi"]`, CPU) runs on a preprocessed image (deskew → CLAHE → bilateral denoise). Results are text-normalised and each line is emitted with a confidence and bounding box.
+- **Hybrid fallback:** if the average OCR confidence is below `0.75`, the text is re-extracted with the **Mistral OCR API** (`mistral-ocr-latest`). On success the text replaces the EasyOCR output, the confidence is boosted, and `ocr_source` is set to `"mistral_fallback"`; otherwise EasyOCR output stands (`ocr_source = "easyocr"`).
+- A quality warning is attached when average confidence falls below `0.5` or nothing is read.
+- Semantic validation fuzzy-matches (rapidfuzz) the expected official headers against the extracted text:
+  - **Aadhaar:** `GOVERNMENT OF INDIA`, `भारत सरकार` (the Hindi header is also OCR'd on a 4× upscaled header-region crop; known EasyOCR Devanagari/English erratums — `भारत→भरत`, `INDIYA→INDIA` — are normalised before scoring).
+  - **PAN:** `INCOME TAX DEPARTMENT`, `GOVT. OF INDIA`.
+  - Any expected string scoring below 88% fuzzy match is recorded as a failed check; risk = `1.0` if any failed, else `0.0`.
+
+### 3. Structural validation (`run_structural_validation`)
+- **Aadhaar:** a 12-digit number must be present (whitespace/hyphens stripped before matching).
+- **PAN:** the number must match `[A-Z]{5}[0-9]{4}[A-Z]`.
+- Missing/invalid identifier ⇒ risk `1.0`; else `0.0`.
+
+### 4. Layout consistency (`run_layout_validation`)
+- The OCR bounding boxes are checked for overlap with **calibrated, relative-coordinate template regions** (tolerance ±20% per region):
+  - **Aadhaar:** name, DOB, gender, Aadhaar number (`REGIONS` in `src/config.py`).
+  - **PAN:** PAN number, applicant name, father's name, DOB (`PAN_REGIONS` in `src/pan_config.py`).
+- Risk = fraction of expected fields not found in their regions.
+
+The per-signal risk thresholds are more lenient than the fuse thresholds because the final score is the weighted combination:
 
 ---
 
-### Frequency Branch (DCT-CNN)
+## Risk Fusion & Decisions
 
-A lightweight, custom 3-layer convolutional network trained from scratch on **Discrete Cosine Transform (DCT) coefficient maps**:
+Fusion (`fusion/risk_engine.py`), driven by fixed weights in `config/risk_weights.py`:
+
+| Signal | Weight |
+|--------|--------|
+| Visual forensics | 0.45 |
+| Semantic validation | 0.30 |
+| Structural validation | 0.15 |
+| Layout consistency | 0.10 |
 
 ```
-Input: (B, 3, 224, 224) — per-channel DCT coefficients (log-scaled, normalized)
-  -> Conv2d(3->32, k=3) + BN + ReLU + MaxPool2d   -> 112x112
-  -> Conv2d(32->64, k=3) + BN + ReLU + MaxPool2d  -> 56x56
-  -> Conv2d(64->128, k=3) + BN + ReLU + AdaptiveAvgPool -> 1x1
-  -> Linear(128 -> 128)
-Output: (B, 128) — frequency feature vector
+final_risk_score = 0.45·visual + 0.30·semantic + 0.15·structural + 0.10·layout
 ```
 
-DCT features expose compression artifacts and high-frequency inconsistencies that GAN-generated faces or digitally edited text fields leave behind, even after downsampling.
+| final_risk_score | Category | Decision |
+|------------------|----------|----------|
+| < 0.30 | `LOW_RISK` | `APPROVE` |
+| < 0.60 | `MEDIUM_RISK` | `REVIEW_REQUIRED` |
+| ≥ 0.60 | `HIGH_RISK` | `SUSPICIOUS` |
+
+Only non-`APPROVE` documents trigger the LLM explanation node.
 
 ---
 
-### Fusion Head
+## Model Details
 
-```
-in_dim = 1280 (spatial) + 128 (freq) = 1408
+`training/model.py` — **`DualBranchForgeryDetector`**
 
-Linear(1408 -> 256) -> BatchNorm1d -> ReLU -> Dropout(0.4)
-Linear(256  ->  64) -> BatchNorm1d -> ReLU -> Dropout(0.4)
-Linear(64   ->   2)   # logits: [real, fake]
-```
+| Component | Details |
+|-----------|---------|
+| Spatial branch | EfficientNet-B0 (timm, ImageNet-pretrained, `num_classes=0`, global avg pool) → 1280-d |
+| Frequency branch | Conv2D 32→64→128 → BN/ReLU/MaxPool → adaptive avg pool → FC → 128-d |
+| Fusion head | `concat(1280, 128) = 1408` → Linear 256 → Linear 64 → Linear 2 (logits) |
+| Loss | Focal loss (α=0.25, γ=2.0) |
+| Optimizer | AdamW, weight decay 1e-4, gradient clipping 1.0 |
 
----
+**Two-phase training** (`training/train.py`):
+- **Phase 1 (backbone frozen):** 5 epochs @ LR 1e-3, trains frequency branch + fusion head only.
+- **Phase 2 (full fine-tune):** up to 30 epochs, differential LRs — backbone 1e-5, frequency 2.5e-4, fusion 5e-4 — with cosine annealing warm restarts and early stopping (patience 10).
 
-### Focal Loss
-
-**Focal Loss** (alpha=0.25, gamma=2.0) combined with **inverse-frequency class weights** computed from the training split:
-
-```
-FL(pt) = alpha * (1 - pt)^gamma * CE(logits, targets)
-```
-
-Focal Loss down-weights easy, well-classified examples and forces the model to focus training signal on hard-to-classify boundary cases.
+**Data hygiene:** `training/dataset.py` uses an **identity-aware split** (`GroupShuffleSplit` keyed on `face_file`) — every document rendered from the same face goes into the same split, so the model cannot memorise faces instead of learning forgery patterns. The final reported run had zero train↔val/train↔test face leakage. Near-real-time inference uses MPS on Apple Silicon, CPU otherwise.
 
 ---
 
-## Dataset Generation Pipelines
+## Evaluation
 
-### Aadhaar Card Pipeline (`src/pipeline.py`)
+Reported metrics from the current run — `results/test_metrics.json`, evaluated on the **held-out identity-aware test set (145 samples)**, no face leakage:
 
-A 6-step procedural generation process:
+| Metric | Score |
+|--------|-------|
+| **Accuracy** | **92.41%** |
+| **Precision** | 96.43% |
+| **Recall** | 85.71% |
+| **F1 score** | 90.76% |
+| **AUC-ROC** | **96.15%** |
 
-| Step | Description |
-|------|-------------|
-| **1** | Copy original real Aadhaar card images -> `output/real/` (label=0) |
-| **2** | Extract clean card templates (mask text/face regions with background colour) |
-| **3** | Analyse TPDNE face images with **DeepFace** (gender + age estimation) -> cached |
-| **4** | Generate real synthetic cards (label=0) — semantically consistent face/name/DOB |
-| **5** | Generate fake/forged cards (label=1) — intentional mismatches + visual augmentations |
-| **6** | Write labeled `output/dataset.csv` |
+Artifacts are written to `results/` (`confusion_matrix.png`, `roc_curve.png`, `training_curves.png`, `training_history.json`).
 
-### PAN Card Pipeline (`src/pan_pipeline.py`)
-
-Mirrors the Aadhaar pipeline for PAN cards with:
-
-- PAN numbers in **official Indian government format**: `AAAPL1234C`
-  - Pos 1-3: Random uppercase letters | Pos 4: Entity type (`P` = person)
-  - Pos 5: First letter of surname | Pos 6-9: Sequential digits (0001-9999) | Pos 10: Check letter
-- Fake PAN numbers use wrong digit count, wrong length, or mixed-case attacks.
-- Father and applicant share the **same surname** for realistic family consistency.
+> Precision is markedly higher than recall — when KYCGuard flags a document it is very likely to be fake, but it will still miss some forgeries. Treat the visual signal as a screening layer, not proof.
 
 ---
 
-### Forgery Categories
+## Dataset Generation
 
-Each fake card is assigned **2-3 tampering categories** drawn from a weighted probability distribution:
+KYCGuard's CNN is trained on **procedurally generated synthetic documents**, not on collected real forgeries.
 
-**Semantic-level (card composer)**
+**Aadhaar pipeline** (`src/pipeline.py`):
+1. Copy the 90 original real Aadhaar scans → `output/real/` (label 0).
+2. Extract clean, blank-card templates from real scans (`src/template_extractor.py`; region calibration via `calibrate.py`).
+3. Analyse candidate face photos with DeepFace (gender + age) → cache.
+4. Generate **200 real-synthetic cards** (label 0) where face gender ↔ name, face age ↔ DOB — all consistent.
+5. Generate **200 fake cards** (label 1), each combining **2–3 tampering categories**, sampled with:
 
-| Category | Attack |
-|----------|--------|
-| `semantic` | Gender swap, age mismatch (+/-25 years), invalid document number |
-| `partial_editing` | Single-field text replacement with subtle font/position shift artifacts |
-| `face_tampering` | Face brightness alteration (spliced face simulation) |
-| `text_tampering` | Font inconsistency + character spacing anomalies on 1-2 fields |
+| Category | Prob. | Example |
+|----------|-------|---------|
+| `semantic_gender`/`age`/`aadhaar` | 0.50 | gender swap, age mismatch, malformed Aadhaar |
+| `partial_editing` | 0.40 | edit a single field with a font/shift/char-spacing penalty |
+| `face_tampering` | 0.35 | face brightness / compositing mismatch |
+| `text_tampering` | 0.45 | font variation, character shift, blurred text |
+| `image_quality` | 0.60 | JPEG compression (q 15–45), Gaussian blur/noise, colour |
+| `structural` | 0.25 | affine warp (~±3°), global shifts |
+| `border_crop` | 0.20 | cropped edges, copy-paste border artifacts |
 
-**Image-level (post-render augmentor)**
+6. Write `output/dataset.csv` → **490 samples** (290 real = 90 originals + 200 synthetic; 200 fake).
 
-| Category | Attacks Applied |
-|----------|-----------------|
-| `image_quality` | JPEG recompression (quality 15-45), Gaussian blur, noise, HSV colour jitter |
-| `structural` | Affine warp (+/-5 degree rotation + shear) |
-| `border_crop` | Copy-paste border artifact rectangles, edge crop + resize |
-| `text_tampering` | Text region blur (selective smudge/erasure simulation) |
+**PAN pipeline** (`src/pan_pipeline.py`): a single calibrated PAN template (`src/clean_pan_sample.png`, `calibrate_pan.py`) is used to render **600 samples** (`output_pan/pan_dataset.csv`: 300 real / 300 fake) with the same tamper-category scheme and valid-format PAN numbers.
 
----
-
-### Anti-Leakage Splitting
-
-**Identity-aware group splitting** using `sklearn.model_selection.GroupShuffleSplit`.
-
-All documents sharing the same `face_file` (TPDNE image) are assigned to the **same split group**, preventing the model from memorizing face identities instead of learning forgery patterns.
-
-```
-Split ratios: 70% / 15% / 15%  (train / val / test)
-Verified: 0 face leakage across any split boundary
-```
+**Training input** (`training/dataset.py`) merges both CSVs (≈1,090 samples) and augments the spatial view at train time (rotation, horizontal flip, brightness, contrast, Gaussian blur).
 
 ---
 
-## Training Strategy
-
-### Phase 1 — Backbone Frozen (Warm-Up)
-
-| Parameter | Value |
-|-----------|-------|
-| Epochs | 5 |
-| Batch Size | 16 |
-| Learning Rate | 1e-3 (AdamW) |
-| Scheduler | CosineAnnealingWarmRestarts (T0=2, T_mult=2) |
-| Trainable | Frequency branch + Fusion head only |
-| Early Stop | Disabled (fixed warm-up) |
-
-The EfficientNet-B0 backbone is completely frozen. Only the frequency branch and fusion head are trained, adapting to the document domain without corrupting ImageNet representations.
-
----
-
-### Phase 2 — Full Fine-Tune (Differential LR)
-
-| Parameter | Value |
-|-----------|-------|
-| Epochs (max) | 30 |
-| Batch Size | 16 |
-| LR — Backbone | **1e-5** (very low, protects pretrained weights) |
-| LR — Freq Branch | 5e-4 |
-| LR — Fusion Head | 1e-3 |
-| Scheduler | CosineAnnealingWarmRestarts (T0=5, T_mult=2) |
-| Weight Decay | 1e-4 |
-| Gradient Clipping | 1.0 |
-| Early Stop Patience | 7 epochs |
-
-Differential learning rates ensure the pretrained backbone adapts slowly while newly initialized layers learn more aggressively. Best checkpoint is saved only when `val_loss` strictly improves (exact float comparison, never overwritten by a worse result).
-
-**Checkpoint management:**
-- `checkpoints/best_model.pt` — globally best validation loss checkpoint
-- `checkpoints/best_phase1_*.pt` / `best_phase2_*.pt` — per-phase bests
-- `checkpoints/final_model.pt` — model state at end of training
-- `results/training_history.json` — written after **every epoch** to prevent loss on crash
-
----
-
-## Evaluation and Explainability
-
-### Evaluation (`training/evaluate.py`)
+## Setup & Installation
 
 ```bash
-python -m training.evaluate
+# 1. Create a virtual environment (Python 3.10+ recommended)
+python3 -m venv venv
+source venv/bin/activate            # Windows: venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Configure secrets (backend/ loading order: .env, then backend/.env)
+cp backend/.env.example backend/.env
+#    edit backend/.env:
+#    GROQ_API_KEY=your_groq_key_here        → enables LLM explanations
+#    MISTRAL_API_KEY=your_key_here          → optional, enables OCR fallback
 ```
 
-Produces:
-- Classification report (precision, recall, F1 per class)
-- Confusion matrix heatmap -> `results/confusion_matrix.png`
-- ROC curve + AUC -> `results/roc_curve.png`
-- Training history curves (loss + accuracy, phase boundary marked) -> `results/training_curves.png`
-- JSON metrics -> `results/test_metrics.json`
-
-### Grad-CAM Explainability (`training/grad_cam.py`)
-
-Grad-CAM hooks the **last convolutional layer of EfficientNet-B0** (`conv_head`) to produce spatial attention heatmaps:
+**Optional — regenerate the dataset:**
 
 ```bash
-python -m training.grad_cam --image path/to/document.jpg
+# Aadhaar cards (needs data/aadhaar/real/ scans + data/faces/ photos)
+python -m src.pipeline
+
+# PAN cards (uses the bundled sample template)
+python -m src.pan_pipeline
 ```
 
-Outputs a 3-panel visualization:
-1. Original document image
-2. Raw Grad-CAM heatmap (jet colormap)
-3. Overlay with prediction label and confidence score
+Face analysis hits DeepFace, which downloads model weights + faces on demand; `--dry-run` analyses faces without rendering cards.
 
-This allows inspection of whether the model is attending to meaningful forgery regions (face splice boundaries, tampered text fields) rather than spurious background features.
+**Optional — (re)train the model:**
+
+```bash
+python -m training.train          # two-phase: frozen backbone, then fine-tune
+python -m training.evaluate       # writes metrics + plots to results/
+python -m training.grad_cam --image path/to/document.jpg   # explainability
+```
+
+The backend already ships a trained checkpoint (`checkpoints/best_model.pt`), so training is not required to run the service. Device is picked automatically — MPS on Apple Silicon, CUDA if available in `training.train`, CPU otherwise.
+
+---
+
+## Running the Backend
+
+```bash
+uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+
+A reload is deliberately avoided (`--reload` is not used): the module loads the model checkpoint at import time and lazily spins up the EasyOCR reader on the first request, and a reload watchdog would re-run that heavy initialisation on every file change. Start it once and leave it.
+
+The service listens for `/predict` (see [API Reference](#api-reference)) and exposes interactive docs at `http://127.0.0.1:8000/docs`.
+
+---
+
+## Running the Frontend
+
+The frontend is static files — serve the `frontend/` folder over HTTP:
+
+```bash
+cd frontend
+python -m http.server 5500
+```
+
+- Landing page: `http://localhost:5500/index.html`
+- Demo tool:  `http://localhost:5500/demo.html` (try it with Aadhaar/PAN samples, upload, or the live webcam capture)
+
+The demo posts the captured/uploaded image to `http://localhost:8000/predict` (`frontend/demo.js`), so keep the backend and the static server running together. It renders the four signal scores, the fused decision, and — when present — the LLM explanation.
+
+> The initial model + OCR warm-up can take a few seconds on the first request.
+
+---
+
+## API Reference
+
+### `POST /predict`
+
+Multipart/form-data:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `file` | image/* | The document image (JPEG/PNG) |
+| `doc_type` | string | `AADHAAR` (default) or `PAN` |
+
+Example:
+
+```bash
+curl -F "file=@aadhaar.jpg" -F "doc_type=AADHAAR" http://127.0.0.1:8000/predict
+```
+
+### Response schema
+
+```jsonc
+{
+  "document_type": "AADHAAR",
+  "visual_forensics": {
+    "risk_score": 0.7314,          // fake probability from the dual-branch CNN
+    "status": "HIGH_RISK"          // LOW_RISK / MEDIUM_RISK / HIGH_RISK (score <0.3 / <0.6 / else)
+  },
+  "ocr": {
+    "confidence": 0.8231,          // average confidence of the OCR run
+    "source": "easyocr",           // "easyocr" | "mistral_fallback"
+    "quality_warning": null,       // set when avg conf < 0.5 or nothing read
+    "extracted_text_sample": "..." // first ~500 chars of extracted text
+  },
+  "semantic_validation": {
+    "risk_score": 1.0,             // 0.0 or 1.0
+    "failed_checks": ["Official English header mismatch: expected 'GOVERNMENT OF INDIA' (fuzzy score 61%)"]
+  },
+  "structural_validation": {
+    "risk_score": 0.0,
+    "failed_checks": []
+  },
+  "layout_validation": {
+    "risk_score": 0.25,            // fraction of expected fields missing from their region
+    "failed_checks": ["Name not found in expected region"]
+  },
+  "final_decision": {
+    "risk_score": 0.62,            // fused: 0.45·visual + 0.30·semantic + 0.15·structural + 0.10·layout
+    "category": "HIGH_RISK",       // LOW_RISK / MEDIUM_RISK / HIGH_RISK
+    "decision": "SUSPICIOUS"       // APPROVE / REVIEW_REQUIRED / SUSPICIOUS
+  },
+  "explanation": "The document was flagged because ..."  // null if approved, or if GROQ_API_KEY unset
+}
+```
+
+Notes:
+- `explanation` is only produced for non-`APPROVE` decisions **and** when `GROQ_API_KEY` is set; otherwise it is `null` or the "unavailable" message.
+- Errors: `400` for non-image uploads, empty files, or an invalid `doc_type`.
+
+---
+
+## Known Limitations
+
+These are honest, code-verified constraints — not feature claims:
+
+1. **Synthetic-to-real domain gap.** The visual CNN was trained on procedurally rendered forgeries (composited cards + JPEG/blur/noise/warp/tamper categories). Heavily degraded, adversarially edited, or retaken (photo-of-screen / re-printed) documents can fall outside the training distribution, which is reflected in the recall of 85.7% — the model misses some fakes.
+2. **Single-template layout calibration.** Layout validation checks against one set of hand-calibrated relative regions per document type (Aadhaar `REGIONS`, PAN `PAN_REGIONS`, ±20% tolerance). Newer or alternate-format editions of the same card may not match those regions, causing false layout flags.
+3. **OCR accuracy on severely degraded images.** EasyOCR runs on CPU and its confidence drops sharply under glare, blur, dark ink, or low resolution. That is mitigated by the Mistral OCR fallback (which needs `MISTRAL_API_KEY` + network) and by quality warnings, but semantic and structural signals are only as good as the extracted text.
+4. **Known OCR erratums.** EasyOCR mis-reads of Devanagari/English headers (e.g. `भारत→भरत`, `INDIYA→INDIA`) are patched by specific normalisation rules, not handled generically.
+5. **LLM explanations are evidence-grounded but require an API key** and only run for flagged documents. They cite only the findings from the four signals; they never perform official verification.
+6. **Format-valid ≠ authentic.** Structural/layout checks verify syntax and placement, not provenance. A well-formed document can still be inauthentic, and validation here is not a substitute for government verification.
+7. **Not a production system.** No document storage, no audit trail, no rate limiting, no concurrency tuning; the model checkpoint is loaded into memory per worker and OCR is cold-started on first request.
 
 ---
 
 ## Project Structure
 
 ```
-fin_modal1/
-|
-+-- src/
-|   +-- __init__.py
-|   +-- augmentor.py            # PIL-based fake augmentations (8 attack types)
-|   +-- card_composer.py        # Aadhaar card composition + tampering
-|   +-- config.py               # Pipeline paths, targets, augmentation probs
-|   +-- data_utils.py           # Indian name/DOB/Aadhaar generators
-|   +-- download_faces.py       # TPDNE face image downloader
-|   +-- face_analyzer.py        # DeepFace wrapper (gender + age, cached JSON)
-|   +-- pan_card_composer.py    # PAN card composition + tampering
-|   +-- pan_config.py           # PAN pipeline configuration
-|   +-- pan_pipeline.py         # PAN card dataset generation orchestrator
-|   +-- pipeline.py             # Aadhaar dataset generation orchestrator
-|   +-- template_extractor.py   # Template masking + metadata extraction
-|
-+-- training/
-|   +-- __init__.py
-|   +-- config.py               # All training hyperparameters (centralized)
-|   +-- dataset.py              # ForgeryDataset + identity-aware GroupShuffleSplit
-|   +-- dct_utils.py            # Per-channel DCT computation + normalization
-|   +-- evaluate.py             # Metrics, confusion matrix, ROC, history plots
-|   +-- grad_cam.py             # Grad-CAM with EfficientNet-B0 forward/backward hooks
-|   +-- model.py                # DualBranchForgeryDetector + FocalLoss
-|   +-- train.py                # Two-phase training loop with checkpointing
-|
-+-- output/                     # Aadhaar dataset images + dataset.csv
-+-- output_pan/                 # PAN dataset images + pan_dataset.csv
-+-- checkpoints/                # .pt checkpoint files
-+-- results/                    # Evaluation outputs (PNG plots + metrics JSON)
-+-- data/                       # Raw real Aadhaar images + TPDNE faces + templates
-|
-+-- audit.py                    # Dataset audit utility
-+-- calibrate.py                # Aadhaar template calibration
-+-- calibrate_pan.py            # PAN template calibration
-+-- verify_checkpoint.py        # Checkpoint integrity checker
-+-- requirements.txt
+./  (repo root)
+├── backend/
+│   ├── main.py            # FastAPI app — POST /predict
+│   ├── graph.py           # LangGraph orchestration + OCR fallback + LLM explanation
+│   └── .env.example       # GROQ_API_KEY (+ optional MISTRAL_API_KEY)
+├── config/
+│   └── risk_weights.py    # fusion weights + risk thresholds
+├── fusion/
+│   └── risk_engine.py     # weighted risk fusion → category + decision
+├── src/
+│   ├── pipeline.py        # Aadhaar dataset generation orchestrator
+│   ├── pan_pipeline.py    # PAN dataset generation orchestrator
+│   ├── config.py          # Aadhaar template REGIONS + fake-category probabilities
+│   ├── pan_config.py      # PAN template PAN_REGIONS + fake config
+│   ├── card_composer.py   # Aadhaar card image compositor
+│   ├── pan_card_composer.py  # PAN card image compositor
+│   ├── template_extractor.py # blank-template extraction from real scans
+│   ├── augmentor.py       # post-render forgery augmentations
+│   ├── face_analyzer.py   # DeepFace gender/age analysis + cache
+│   ├── data_utils.py      # names, DOB, Aadhaar/PAN number generators
+│   ├── ocr/
+│   │   ├── ocr_engine.py      # EasyOCR wrapper (en+hi, CPU)
+│   │   ├── mistral_engine.py  # Mistral OCR API fallback
+│   │   ├── preprocessing.py   # deskew / CLAHE / denoise
+│   │   └── text_normalizer.py # NFC + whitespace normalisation
+│   └── validation/
+│       ├── aadhaar_validator.py  # semantic + structural checks (Aadhaar)
+│       ├── pan_validator.py      # semantic + structural checks (PAN)
+│       └── layout_validator.py   # bbox-vs-region layout checks
+├── training/
+│   ├── model.py           # DualBranchForgeryDetector + FocalLoss
+│   ├── config.py          # hyperparameters / paths
+│   ├── train.py           # two-phase training loop
+│   ├── dataset.py         # identity-aware split + dual-view dataset
+│   ├── dct_utils.py       # log-scaled 2-D DCT
+│   ├── evaluate.py        # metrics + plots → results/
+│   └── grad_cam.py        # Grad-CAM visualisation
+├── frontend/
+│   ├── index.html         # landing page (signals overview)
+│   ├── demo.html          # demo tool (upload + webcam)
+│   ├── styles.css         # shared styling
+│   ├── landing.js         # hero animation, typewriter, scroll effects
+│   └── demo.js            # capture/upload → /predict → result rendering
+├── checkpoints/           # best_model.pt / final_model.pt
+├── results/               # test_metrics.json, confusion/ROC/curves PNGs
+├── output/                # Aadhaar dataset (dataset.csv + images)
+├── output_pan/            # PAN dataset (pan_dataset.csv + images)
+├── data/                  # real scans, faces, templates, fonts
+├── calibrate.py           # Aadhaar region calibration tool
+├── calibrate_pan.py       # PAN region calibration tool
+└── requirements.txt
 ```
 
 ---
 
-## Setup and Installation
+## Licence
 
-### Prerequisites
-
-- Python 3.10+
-- pip
-
-### Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-> **Windows note**: `NUM_WORKERS=0` is set by default in `training/config.py` for PyTorch multiprocessing compatibility on Windows.
-
-### Data Setup
-
-Place original real Aadhaar card images in `data/real/` and TPDNE face images in `data/faces/`. The PAN sample card is already at `src/sample-pan-card.jpg`.
-
----
-
-## Usage
-
-### 1. Generate Datasets
-
-```bash
-# Aadhaar dataset (full run)
-python -m src.pipeline
-
-# PAN dataset
-python -m src.pan_pipeline --n-real 300 --n-fake 300
-
-# Dry run (face analysis only, no card images written)
-python -m src.pipeline --dry-run
-
-# Skip template extraction (reuse existing templates)
-python -m src.pipeline --skip-extract --verbose
-```
-
-### 2. Train the Model
-
-```bash
-# Default configuration
-python -m training.train
-
-# Custom epochs/batch size
-python -m training.train --phase1-epochs 5 --phase2-epochs 30 --phase1-batch 16
-```
-
-### 3. Evaluate
-
-```bash
-# Evaluate best checkpoint
-python -m training.evaluate
-
-# Evaluate a specific checkpoint
-python -m training.evaluate --checkpoint checkpoints/best_model.pt
-```
-
-### 4. Grad-CAM Visualization
-
-```bash
-python -m training.grad_cam --image path/to/document.jpg
-python -m training.grad_cam --image path/to/document.jpg --checkpoint checkpoints/best_model.pt
-```
-
-### 5. Verify Checkpoint
-
-```bash
-python verify_checkpoint.py
-```
-
----
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Deep Learning | PyTorch >= 2.0 |
-| Backbone | EfficientNet-B0 via `timm` >= 0.9 |
-| Face Analysis | DeepFace >= 0.0.79 (gender + age estimation) |
-| Image Processing | OpenCV >= 4.8, Pillow >= 10.0 |
-| Data Handling | NumPy, pandas |
-| ML Utilities | scikit-learn (GroupShuffleSplit, metrics) |
-| Visualization | matplotlib, seaborn |
-| Scheduler | CosineAnnealingWarmRestarts |
-| Optimizer | AdamW with differential learning rates |
-| Loss | Custom Focal Loss (alpha=0.25, gamma=2.0) |
-
----
-
-## Key Design Decisions
-
-- **EfficientNet-B0 over ViT**: More parameter-efficient for this dataset size; stronger inductive bias for local texture patterns critical in document forensics. ViTs need much larger datasets to converge.
-- **DCT frequency branch**: JPEG compression, GAN generation, and image editing all leave artifacts in the frequency domain that spatial CNNs may miss. The DCT branch is purpose-built to detect these invisible signatures.
-- **Focal Loss**: The difficulty distribution across fakes is heavily skewed (some are very subtle). Focal Loss emphasizes hard examples during training.
-- **Identity-aware splitting**: Without group splitting, inflated test accuracy from face identity memorization would render the evaluation meaningless.
-
----
-
-*KYCGuard AI Model 1 — Built for robust KYC fraud detection in digital banking.*
+Not specified. Research prototype — see the disclaimer at the top of this document before using it for anything other than experimentation.
