@@ -377,10 +377,7 @@ These are honest, code-verified constraints — not feature claims:
 
 1. **Synthetic-to-real domain gap.** The visual CNN was trained on procedurally rendered forgeries (composited cards + JPEG/blur/noise/warp/tamper categories). Heavily degraded, adversarially edited, or retaken (photo-of-screen / re-printed) documents can fall outside the training distribution, which is reflected in the recall of 85.7% — the model misses some fakes.
 2. **Single-template layout calibration.** Layout validation checks against one set of hand-calibrated relative regions per document type (Aadhaar `REGIONS`, PAN `PAN_REGIONS`, ±20% tolerance). Newer or alternate-format editions of the same card may not match those regions, causing false layout flags.
-3. **OCR accuracy on severely degraded images.** EasyOCR runs on CPU and its confidence drops sharply under glare, blur, dark ink, or low resolution. That is mitigated by the Mistral OCR fallback (which needs `MISTRAL_API_KEY` + network) and by quality warnings, but semantic and structural signals are only as good as the extracted text.
-4. **Known OCR erratums.** EasyOCR mis-reads of Devanagari/English headers (e.g. `भारत→भरत`, `INDIYA→INDIA`) are patched by specific normalisation rules, not handled generically.
-5. **LLM explanations are evidence-grounded but require an API key** and only run for flagged documents. They cite only the findings from the four signals; they never perform official verification.
-6. **Format-valid ≠ authentic.** Structural/layout checks verify syntax and placement, not provenance. A well-formed document can still be inauthentic, and validation here is not a substitute for government verification.
+3. **Format-valid ≠ authentic.** Structural/layout checks verify syntax and placement, not provenance. A well-formed document can still be inauthentic, and validation here is not a substitute for government verification.
 
 ---
 
