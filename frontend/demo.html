@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KYCGuard — Try It Now</title>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Animated background layers -->
+  <div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb--1"></div>
+    <div class="orb orb--2"></div>
+    <div class="orb orb--3"></div>
+  </div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="scan-line scan-line--1" aria-hidden="true"></div>
+  <div class="scan-line scan-line--2" aria-hidden="true"></div>
+  <div class="bg-particles" aria-hidden="true">
+    <span class="particle" style="left: 6%; width: 3px; height: 3px; animation-duration: 11s; animation-delay: 0s;"></span>
+    <span class="particle" style="left: 14%; width: 2px; height: 2px; animation-duration: 9s; animation-delay: 1.2s;"></span>
+    <span class="particle" style="left: 22%; width: 4px; height: 4px; animation-duration: 13s; animation-delay: 2.6s;"></span>
+    <span class="particle" style="left: 32%; width: 3px; height: 3px; animation-duration: 10s; animation-delay: 0.8s;"></span>
+    <span class="particle" style="left: 42%; width: 2px; height: 2px; animation-duration: 12s; animation-delay: 3.4s;"></span>
+    <span class="particle" style="left: 51%; width: 3px; height: 3px; animation-duration: 9.5s; animation-delay: 1.8s;"></span>
+    <span class="particle" style="left: 60%; width: 4px; height: 4px; animation-duration: 14s; animation-delay: 0.4s;"></span>
+    <span class="particle" style="left: 68%; width: 2px; height: 2px; animation-duration: 10.5s; animation-delay: 2.2s;"></span>
+    <span class="particle" style="left: 76%; width: 3px; height: 3px; animation-duration: 12.5s; animation-delay: 3.8s;"></span>
+    <span class="particle" style="left: 85%; width: 2px; height: 2px; animation-duration: 9s; animation-delay: 1.5s;"></span>
+    <span class="particle" style="left: 92%; width: 4px; height: 4px; animation-duration: 11.5s; animation-delay: 0.6s;"></span>
+    <span class="particle" style="left: 38%; width: 2px; height: 2px; animation-duration: 13.5s; animation-delay: 2.9s;"></span>
+  </div>
+  <div class="bg-noise" aria-hidden="true"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- NAV -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <header class="site-nav">
+    <a href="index.html" class="nav-brand" aria-label="KYCGuard home">
+      <span class="nav-word">KYC</span><span class="nav-word-accent">Guard</span>
+    </a>
+    <a href="index.html" class="nav-back" aria-label="Back to home page">
+      <span aria-hidden="true">←</span>
+      <span>Back to Home</span>
+    </a>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- TOOL SECTION -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <section class="tool-section" id="try-it-now">
+    <div class="section-label reveal">Live Demo</div>
+    <h2 class="section-title reveal">Try It Now</h2>
+    <p class="section-desc reveal">
+      Upload or capture a document image. KYCGuard will run all four signals
+      and produce a risk assessment in seconds.
+    </p>
+
+    <div class="tool-card reveal">
+      <!-- Document type selector -->
+      <div class="doc-type-row">
+        <label>
+          <input type="radio" name="doc_type" value="AADHAAR" checked />
+          <span>Aadhaar</span>
+        </label>
+        <label>
+          <input type="radio" name="doc_type" value="PAN" />
+          <span>PAN</span>
+        </label>
+      </div>
+
+      <!-- Input mode tabs -->
+      <div class="input-tabs" role="tablist">
+        <button type="button" class="tab-btn active" data-tab="upload" role="tab" aria-selected="true">
+          <span>Upload</span>
+        </button>
+        <button type="button" class="tab-btn" data-tab="camera" role="tab" aria-selected="false">
+          <span>Camera</span>
+        </button>
+      </div>
+
+      <!-- Upload panel -->
+      <div class="tab-panel active" id="panel-upload" role="tabpanel">
+        <label class="upload-area" for="file-input" id="drop-zone">
+          <i data-lucide="upload" class="upload-icon" aria-hidden="true"></i>
+          <div class="primary-text">Drop a document image here</div>
+          <p>or click to browse — JPG, PNG supported</p>
+          <input type="file" id="file-input" accept="image/*" />
+        </label>
+      </div>
+
+      <!-- Camera panel -->
+      <div class="tab-panel" id="panel-camera" role="tabpanel">
+        <div class="cam-stage" id="cam-stage">
+          <video id="cam-video" autoplay playsinline muted></video>
+          <canvas id="cam-canvas" hidden></canvas>
+          <img id="cam-still" alt="Captured document" hidden />
+          <div class="cam-status" id="cam-loading">
+            <i data-lucide="video" aria-hidden="true"></i>
+            Requesting camera access…
+          </div>
+          <div class="cam-error" id="cam-error" hidden>
+            <i data-lucide="triangle-alert" class="warn-icon" aria-hidden="true"></i>
+            <span>Camera access denied or unavailable. Please use Upload instead.</span>
+          </div>
+        </div>
+        <p class="cam-hint" id="cam-hint">Position the document in view, then press the shutter</p>
+        <div class="cam-controls">
+          <button type="button" id="cam-capture" class="cam-shutter" aria-label="Capture photo" hidden>
+            <span class="cam-shutter-inner"><i data-lucide="camera" aria-hidden="true"></i></span>
+          </button>
+          <button type="button" id="cam-retake" class="cam-retake" hidden>Retake</button>
+        </div>
+      </div>
+
+      <div class="filename" id="filename" aria-live="polite"></div>
+
+      <button id="check-btn" class="check-btn" disabled>
+        <span class="btn-shimmer" aria-hidden="true"></span>
+        <span class="btn-spinner" aria-hidden="true"></span>
+        <span class="btn-text">Check Document</span>
+      </button>
+
+      <div class="spinner" id="spinner" role="status" aria-live="polite">
+        <div class="spinner-dot"></div>
+        <div class="spinner-dot"></div>
+        <div class="spinner-dot"></div>
+        <span style="margin-left: 0.3rem;">Analyzing document…</span>
+      </div>
+
+      <div class="error" id="error" role="alert"></div>
+
+      <!-- Results -->
+      <div class="result" id="result" aria-live="polite">
+        <div class="signal-grid" id="signals"></div>
+
+        <div class="final-decision" id="final-decision"></div>
+
+        <div class="ocr-section" id="ocr-section">
+          <div class="ocr-label">OCR Extracted Text (sample)</div>
+          <div class="ocr-meta">
+            <span class="badge neutral" id="ocr-source-badge">EasyOCR</span>
+          </div>
+          <div class="ocr-text" id="ocr-text"></div>
+        </div>
+
+        <div class="explanation-box" id="explanation-box" style="display:none;"></div>
+        <div class="ocr-warning" id="ocr-warning" style="display:none;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- FOOTER -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <footer class="site-footer">
+    <span class="footer-logo" aria-label="KYCGuard"><span class="fin">KYC</span><span class="shield">Guard</span></span>
+    <p class="footer-note">Research prototype, not a production KYC verification system.</p>
+    <p class="footer-stack">Built with <span class="stack-pill">PyTorch</span>, <span class="stack-pill">FastAPI</span>, <span class="stack-pill">LangGraph</span>, and OCR-based document intelligence.</p>
+  </footer>
+
+  <script src="demo.js"></script>
+</body>
+</html>
