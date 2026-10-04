@@ -2,13 +2,15 @@ import io
 
 import numpy as np
 import torch
-from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
-load_dotenv()
-load_dotenv("backend/.env")
+from src.env_config import load_project_env
+
+# Local dev only: loads backend/.env (CWD-independent). Real environment
+# variables win, and a deployed image has no .env file, so this is a no-op there.
+load_project_env()
 
 from training.config import IMAGENET_MEAN, IMAGENET_STD, IMG_SIZE
 from training.dct_utils import compute_dct

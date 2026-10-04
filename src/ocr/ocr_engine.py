@@ -9,6 +9,16 @@ from config.risk_weights import OCR_PREPROCESSING_ENABLED, OCR_CONFIDENCE_WARNIN
 from .preprocessing import preprocess
 from .text_normalizer import normalize_ocr_result
 
+NO_TEXT_WARNING = (
+    "No text could be extracted from the image. "
+    "Ensure the document is clearly visible, well-lit, and in focus."
+)
+
+LOW_QUALITY_WARNING = (
+    "Image quality is low — OCR results may be unreliable. "
+    "Consider retaking the photo with better lighting and less glare."
+)
+
 
 class OCREngine:
     def __init__(self):
@@ -41,15 +51,9 @@ class OCREngine:
 
         warning = None
         if not results:
-            warning = (
-                "No text could be extracted from the image. "
-                "Ensure the document is clearly visible, well-lit, and in focus."
-            )
+            warning = NO_TEXT_WARNING
         elif avg_conf < OCR_CONFIDENCE_WARNING_THRESHOLD:
-            warning = (
-                "Image quality is low — OCR results may be unreliable. "
-                "Consider retaking the photo with better lighting and less glare."
-            )
+            warning = LOW_QUALITY_WARNING
 
         return results, avg_conf, warning
 

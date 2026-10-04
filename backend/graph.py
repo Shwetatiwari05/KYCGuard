@@ -12,12 +12,13 @@ from langgraph.graph import END, START, StateGraph
 from PIL import Image
 from typing_extensions import TypedDict
 
-from config.risk_weights import RISK_WEIGHTS
+from config.risk_weights import OCR_CONFIDENCE_WARNING_THRESHOLD, RISK_WEIGHTS
 from fusion.risk_engine import fuse
 from training.config import CHECKPOINT_DIR
 from training.model import DualBranchForgeryDetector
-from src.ocr.ocr_engine import OCREngine
+from src.ocr.ocr_engine import LOW_QUALITY_WARNING, OCREngine
 from src.ocr.mistral_engine import MistralOCREngine
+from src.ocr.text_normalizer import normalize
 from src.validation import (
     aadhaar_validator,
     layout_validator,
@@ -25,8 +26,6 @@ from src.validation import (
 )
 
 GROQ_MODEL = "openai/gpt-oss-20b"
-
-OCR_FALLBACK_CONFIDENCE_THRESHOLD = 0.75
 
 # ── Model (loaded once at import / startup) ─────────────────────────────────
 _device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
@@ -37,15 +36,28 @@ _ckpt = torch.load(_ckpt_path, map_location=_device, weights_only=False)
 _model.load_state_dict(_ckpt["model_state_dict"])
 _model.eval()
 
-# OCR reader (lazy init to avoid slow import-time hangs)
+# OCR engines (lazy init to avoid slow import-time hangs)
 _ocr_reader: OCREngine | None = None
+_mistral_reader: MistralOCREngine | None = None
+_engine_init_lock = threading.Lock()
 
 
 def _get_ocr() -> OCREngine:
     global _ocr_reader
     if _ocr_reader is None:
-        _ocr_reader = OCREngine()
+        with _engine_init_lock:
+            if _ocr_reader is None:
+                _ocr_reader = OCREngine()
     return _ocr_reader
+
+
+def _get_mistral() -> MistralOCREngine:
+    global _mistral_reader
+    if _mistral_reader is None:
+        with _engine_init_lock:
+            if _mistral_reader is None:
+                _mistral_reader = MistralOCREngine()
+    return _mistral_reader
 
 
 # ── Timing instrumentation (parallel-validation benchmark) ─────────────────
@@ -99,39 +111,74 @@ def run_visual_model(state: GraphState) -> GraphState:
     return {"visual_risk_score": fake_prob}
 
 
+def _run_mistral(arr: np.ndarray) -> tuple[str, float]:
+    """Call the primary Mistral OCR engine on a request.
+
+    Returns (text, confidence) on success, or ("", 0.0) on any failure — missing
+    MISTRAL_API_KEY, timeout, rate limit, network/API error or an unusable
+    response — so the caller can fall through to EasyOCR instead of raising.
+    """
+    if not os.environ.get("MISTRAL_API_KEY"):
+        return "", 0.0
+    try:
+        text, confidence = _get_mistral().run(arr)
+    except Exception:
+        return "", 0.0
+    return text, confidence
+
+
 def run_ocr(state: GraphState) -> GraphState:
     _mark("ocr")
     img = state["image"]
     arr = np.array(img)
-    reader = _get_ocr()
-    results, avg_conf, warning = reader.run(arr)
 
-    all_text = " ".join(r["text"] for r in results)
-    sample = all_text[:500]
-    ocr_source = "easyocr"
+    # Layout validation scores word bounding boxes, and only EasyOCR emits them,
+    # so run it in the background while Mistral (the primary text engine) answers.
+    # Wall-clock cost stays near max(mistral, easyocr) instead of their sum.
+    geometry: list[tuple[list[dict], float, str | None] | None] = [None]
 
-    if avg_conf < OCR_FALLBACK_CONFIDENCE_THRESHOLD:
+    def _easyocr_geometry() -> None:
         try:
-            with MistralOCREngine() as mistral:
-                mistral_text, mistral_conf = mistral.run(arr)
-            if mistral_text and mistral_text.strip():
-                all_text = mistral_text.replace("\n", " ").strip()
-                sample = all_text[:500]
-                avg_conf = max(avg_conf, mistral_conf)
-                warning = None
-                ocr_source = "mistral_fallback"
+            geometry[0] = _get_ocr().run(arr)
         except Exception:
-            pass
+            geometry[0] = None
+
+    worker = threading.Thread(target=_easyocr_geometry, daemon=True)
+    worker.start()
+
+    mistral_text, mistral_conf = _run_mistral(arr)
+
+    worker.join()
+
+    easy = geometry[0]
+    # None => the geometry pass failed; [] => EasyOCR ran and read nothing.
+    easy_results = easy[0] if easy is not None else None
+    easy_conf, easy_warning = (easy[1], easy[2]) if easy is not None else (0.0, None)
+
+    if mistral_text.strip():
+        extracted_text = normalize(mistral_text)
+        ocr_source = "mistral"
+        confidence = mistral_conf
+        warning = (
+            LOW_QUALITY_WARNING
+            if confidence < OCR_CONFIDENCE_WARNING_THRESHOLD
+            else None
+        )
+    else:
+        extracted_text = " ".join(r["text"] for r in easy_results or [])
+        ocr_source = "easyocr_fallback"
+        confidence = easy_conf
+        warning = easy_warning
 
     with _timing_lock:
         global _ocr_done_at
         _ocr_done_at = time.perf_counter()
 
     return {
-        "ocr_results": results,
-        "extracted_text": all_text,
-        "extracted_text_sample": sample,
-        "ocr_confidence": avg_conf,
+        "ocr_results": easy_results,
+        "extracted_text": extracted_text,
+        "extracted_text_sample": extracted_text[:500],
+        "ocr_confidence": confidence,
         "ocr_quality_warning": warning,
         "ocr_source": ocr_source,
     }
@@ -158,7 +205,11 @@ def _run_layout(state: GraphState) -> tuple[float, list[str]]:
     doc_type = state["doc_type"]
     img = state["image"]
     w, h = img.size
-    ocr_results = state.get("ocr_results") or []
+    ocr_results = state.get("ocr_results")
+    if ocr_results is None:
+        # No geometry at all (the EasyOCR pass failed) — omit the signal rather
+        # than reporting every field as missing.
+        return 0.0, []
     return layout_validator.validate_layout(ocr_results, w, h, doc_type)
 
 

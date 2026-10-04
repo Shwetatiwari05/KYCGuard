@@ -1,21 +1,35 @@
-"""Mistral OCR API wrapper — cloud-based OCR as an alternative to EasyOCR."""
+"""Mistral OCR API wrapper — the primary OCR engine, with EasyOCR as fallback."""
 
 from __future__ import annotations
 
 import base64
 import os
+import re
 import time
 from pathlib import Path
 
 import cv2
 import numpy as np
-from dotenv import load_dotenv
 
-load_dotenv()
+from src.env_config import load_project_env
 
-MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
+# Local dev only: pulls MISTRAL_API_KEY out of backend/.env. Existing
+# environment variables (Cloud Run env vars / Secret Manager) take precedence,
+# and in a deployed image no .env file exists so this is a no-op.
+load_project_env()
+
 MISTRAL_OCR_URL = "https://api.mistral.ai/v1/ocr"
 MISTRAL_MODEL = "mistral-ocr-latest"
+
+# Markdown furniture Mistral emits for layout (table pipes, bold/italic markers,
+# headings, image/link syntax). Left in place it glues itself to header words
+# ("**भारत**", "|INCOME|TAX|") and defeats the validators' word-level matching.
+_MD_NOISE_RE = re.compile(r"[*_`#|!\[\]]")
+
+
+def _flatten_markdown(markdown: str) -> str:
+    """Flatten a markdown page into plain, single-line text for fuzzy matching."""
+    return " ".join(_MD_NOISE_RE.sub(" ", markdown.replace("\n", " ")).split())
 
 
 def _encode_image_to_base64(image: np.ndarray, fmt: str = "JPEG") -> str:
@@ -32,9 +46,17 @@ class MistralOCREngine:
 
     def __init__(self, api_key: str | None = None):
         import httpx
-        self._api_key = api_key or MISTRAL_API_KEY
+        # Read live (not at import time) so a key exported after import, or one
+        # injected by the platform, is picked up.
+        self._api_key = (api_key or os.environ.get("MISTRAL_API_KEY") or "").strip()
         if not self._api_key:
-            raise ValueError("MISTRAL_API_KEY not set in environment or provided.")
+            raise ValueError(
+                "MISTRAL_API_KEY not set in environment or provided. "
+                "Add it to backend/.env for local development, or set it as an "
+                "environment variable / Secret Manager secret in deployment."
+            )
+        # Kept short so a slow/hanging request can't stall the pipeline; on
+        # timeout the caller falls back to EasyOCR.
         self._client = httpx.Client(
             timeout=httpx.Timeout(5.0, connect=3.0)
         )
@@ -81,9 +103,11 @@ class MistralOCREngine:
         for page in pages:
             md = page.get("markdown", "")
             if md:
-                texts.append(md)
+                flat = _flatten_markdown(md)
+                if flat:
+                    texts.append(flat)
 
-        extracted = "\n".join(texts)
+        extracted = " ".join(texts)
 
         confidence = 1.0
         cs = result.get("confidence_scores")
