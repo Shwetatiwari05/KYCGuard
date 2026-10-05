@@ -17,7 +17,7 @@ from fusion.risk_engine import fuse
 from training.config import CHECKPOINT_DIR
 from training.model import DualBranchForgeryDetector
 from src.ocr.ocr_engine import LOW_QUALITY_WARNING, OCREngine
-from src.ocr.mistral_engine import MistralOCREngine
+from src.ocr.gemini_engine import GeminiOCREngine
 from src.ocr.text_normalizer import normalize
 from src.validation import (
     aadhaar_validator,
@@ -38,7 +38,7 @@ _model.eval()
 
 # OCR engines (lazy init to avoid slow import-time hangs)
 _ocr_reader: OCREngine | None = None
-_mistral_reader: MistralOCREngine | None = None
+_gemini_reader: GeminiOCREngine | None = None
 _engine_init_lock = threading.Lock()
 
 
@@ -51,13 +51,13 @@ def _get_ocr() -> OCREngine:
     return _ocr_reader
 
 
-def _get_mistral() -> MistralOCREngine:
-    global _mistral_reader
-    if _mistral_reader is None:
+def _get_gemini() -> GeminiOCREngine:
+    global _gemini_reader
+    if _gemini_reader is None:
         with _engine_init_lock:
-            if _mistral_reader is None:
-                _mistral_reader = MistralOCREngine()
-    return _mistral_reader
+            if _gemini_reader is None:
+                _gemini_reader = GeminiOCREngine()
+    return _gemini_reader
 
 
 # ── Timing instrumentation (parallel-validation benchmark) ─────────────────
@@ -111,20 +111,26 @@ def run_visual_model(state: GraphState) -> GraphState:
     return {"visual_risk_score": fake_prob}
 
 
-def _run_mistral(arr: np.ndarray) -> tuple[str, float]:
-    """Call the primary Mistral OCR engine on a request.
+def _run_gemini(arr: np.ndarray) -> tuple[str, float]:
+    """Call the primary Gemini OCR engine on a request.
 
     Returns (text, confidence) on success, or ("", 0.0) on any failure — missing
-    MISTRAL_API_KEY, timeout, rate limit, network/API error or an unusable
+    GEMINI_API_KEY, timeout, rate limit, network/API error or an unusable
     response — so the caller can fall through to EasyOCR instead of raising.
     """
-    if not os.environ.get("MISTRAL_API_KEY"):
+    if not os.environ.get("GEMINI_API_KEY"):
+        print("[gemini] GEMINI_API_KEY not set; falling back to EasyOCR")
         return "", 0.0
     try:
-        text, confidence = _get_mistral().run(arr)
-    except Exception:
+        text, confidence = _get_gemini().run(arr)
+        return text, confidence
+    except Exception as e:
+        try:
+            msg = str(e)
+        except Exception:
+            msg = "unknown error"
+        print(f"[gemini] Failed ({type(e).__name__}): {msg}; falling back to EasyOCR")
         return "", 0.0
-    return text, confidence
 
 
 def run_ocr(state: GraphState) -> GraphState:
@@ -133,8 +139,8 @@ def run_ocr(state: GraphState) -> GraphState:
     arr = np.array(img)
 
     # Layout validation scores word bounding boxes, and only EasyOCR emits them,
-    # so run it in the background while Mistral (the primary text engine) answers.
-    # Wall-clock cost stays near max(mistral, easyocr) instead of their sum.
+    # so run it in the background while Gemini (the primary text engine) answers.
+    # Wall-clock cost stays near max(gemini, easyocr) instead of their sum.
     geometry: list[tuple[list[dict], float, str | None] | None] = [None]
 
     def _easyocr_geometry() -> None:
@@ -146,7 +152,7 @@ def run_ocr(state: GraphState) -> GraphState:
     worker = threading.Thread(target=_easyocr_geometry, daemon=True)
     worker.start()
 
-    mistral_text, mistral_conf = _run_mistral(arr)
+    gemini_text, gemini_conf = _run_gemini(arr)
 
     worker.join()
 
@@ -155,10 +161,10 @@ def run_ocr(state: GraphState) -> GraphState:
     easy_results = easy[0] if easy is not None else None
     easy_conf, easy_warning = (easy[1], easy[2]) if easy is not None else (0.0, None)
 
-    if mistral_text.strip():
-        extracted_text = normalize(mistral_text)
-        ocr_source = "mistral"
-        confidence = mistral_conf
+    if gemini_text.strip():
+        extracted_text = normalize(gemini_text)
+        ocr_source = "gemini"
+        confidence = gemini_conf
         warning = (
             LOW_QUALITY_WARNING
             if confidence < OCR_CONFIDENCE_WARNING_THRESHOLD

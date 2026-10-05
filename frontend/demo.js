@@ -288,9 +288,9 @@
         ${reasons.length ? `<div class="fd-reasons"><strong>Reasons flagged:</strong><ul>${reasons.map(r => `<li>${r}</li>`).join("")}</ul></div>` : ""}
       `;
 
-      const src = (data.ocr && data.ocr.source) ? data.ocr.source : "mistral";
+      const src = (data.ocr && data.ocr.source) ? data.ocr.source : "gemini";
       const isFallback = src === "easyocr_fallback";
-      ocrSourceBadge.textContent = isFallback ? "EasyOCR (fallback)" : "Mistral OCR";
+      ocrSourceBadge.textContent = isFallback ? "EasyOCR (fallback)" : "Gemini OCR";
       ocrSourceBadge.className = "badge " + (isFallback ? "source" : "neutral");
 
       ocrText.textContent = data.ocr.extracted_text_sample || "(no text extracted)";

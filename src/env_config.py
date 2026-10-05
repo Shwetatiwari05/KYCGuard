@@ -1,6 +1,6 @@
 """Environment/secret loading for local development.
 
-Cloud Run (and any container/CI runtime) injects `MISTRAL_API_KEY` / `GROQ_API_KEY`
+Cloud Run (and any container/CI runtime) injects `GEMINI_API_KEY` / `GROQ_API_KEY`
 as real environment variables, so those always win. The `.env` files below are a
 local-development convenience only: they are loaded with ``override=False`` and
 are silently skipped when absent (as they are in a deployed image).

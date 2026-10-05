@@ -69,7 +69,7 @@ The system is exposed through a FastAPI service (`POST /predict`) and a two-page
 │              ▼                                                              │
 │     └─▶ run_ocr                                                              │
 │              │                                                               │
-│              │                Mistral OCR API — primary engine (5 s timeout).│
+│              │                Gemini OCR API — primary engine.│
 │              │                EasyOCR (en+hi, CPU) runs in parallel for the  │
 │              │                word boxes layout validation needs, and is     │
 │              │                the text fallback when Mistral is unavailable  │
@@ -109,15 +109,15 @@ Pulled from [`requirements.txt`](requirements.txt) and the actual imports:
 | **Dataset generation** | OpenCV, Pillow, NumPy, Pandas, tqdm, DeepFace (gender/age face analysis, via `tf-keras`), requests |
 | **Training** | PyTorch, torchvision, timm (EfficientNet-B0), SciPy (DCT), scikit-learn (metrics/splits), matplotlib, seaborn |
 | **Backend / orchestration** | FastAPI, uvicorn, python-multipart, LangGraph, langchain-groq, python-dotenv |
-| **OCR / validation** | Mistral OCR API (primary), EasyOCR (en + hi, CPU — fallback + layout boxes), rapidfuzz (fuzzy matching), httpx |
+| **OCR / validation** | Gemini OCR API (primary), EasyOCR (en + hi, CPU — fallback + layout boxes), rapidfuzz (fuzzy matching), httpx |
 | **Frontend** | Vanilla HTML/CSS/JS + Lucide icons + Google Fonts (CDN) — no build step |
 
 Optional runtime keys (loaded from `.env` / `backend/.env`):
 
 - `GROQ_API_KEY` — enables the LLM explanation layer (`openai/gpt-oss-20b`). Without it, `explanation` is returned as `"Explanation unavailable: GROQ_API_KEY not set."`
-- `MISTRAL_API_KEY` — optional; enables the primary Mistral OCR engine. Without it every request falls back to EasyOCR (`ocr_source = "easyocr_fallback"`).
+- `GEMINI_API_KEY` — optional; enables the primary Gemini OCR engine. Without it every request falls back to EasyOCR (`ocr_source = "easyocr_fallback"`).
 
-Secret loading (`src/env_config.py`): `backend/.env` and `.env` are resolved from the **project root** (not the working directory), so the app behaves the same whether it is started from the repo root or elsewhere. They are loaded with `override=False`, so a real environment variable always wins — in Cloud Run, set `MISTRAL_API_KEY` / `GROQ_API_KEY` as environment variables (Secret Manager) and the loader finds no file and does nothing. `.env` files are excluded from git (`.gitignore`) and from the Docker build context (`.dockerignore`).
+Secret loading (`src/env_config.py`): `backend/.env` and `.env` are resolved from the **project root** (not the working directory), so the app behaves the same whether it is started from the repo root or elsewhere. They are loaded with `override=False`, so a real environment variable always wins — in Cloud Run, set `GEMINI_API_KEY` / `GROQ_API_KEY` as environment variables (Secret Manager) and the loader finds no file and does nothing. `.env` files are excluded from git (`.gitignore`) and from the Docker build context (`.dockerignore`).
 
 ---
 
@@ -131,8 +131,8 @@ Secret loading (`src/env_config.py`): `backend/.env` and `.env` are resolved fro
 - Regions the model leans on can be inspected with Grad-CAM (`training/grad_cam.py`).
 
 ### 2. OCR + semantic validation (`run_ocr` → `run_semantic_validation`)
-- **Primary engine: Mistral OCR** (`mistral-ocr-latest`) is called first on every request and its text (markdown flattened to plain text) becomes `extracted_text` for semantic + structural validation. Its markdown furniture — table pipes, bold/heading markers — is stripped so word-level fuzzy matching still works.
-- **Fallback engine: EasyOCR** (`["en", "hi"]`, CPU) takes over whenever Mistral can't deliver usable text: `MISTRAL_API_KEY` unset, network error, API/rate-limit error, or a `5s` timeout (a slow call can never stall the pipeline). Its output then becomes `extracted_text` and `ocr_source` is `"easyocr_fallback"`.
+- **Primary engine: Gemini OCR** (`gemini-3.5-flash`) is called first on every request and its extracted text becomes `extracted_text` for semantic + structural validation.
+- **Fallback engine: EasyOCR** (`["en", "hi"]`, CPU) takes over whenever Gemini can't deliver usable text: `GEMINI_API_KEY` unset, network error, API/rate-limit error, timeout, or network issue (a slow call can never stall the pipeline). Its output then becomes `extracted_text` and `ocr_source` is `"easyocr_fallback"`.
 - EasyOCR additionally always runs (in a background thread, concurrently with the Mistral call, so the cost is `max(mistral, easyocr)` not their sum) because layout validation scores word bounding boxes and only EasyOCR emits them. It reads a preprocessed image (deskew → CLAHE → bilateral denoise); results are text-normalised and each line carries a confidence and bounding box.
 - `ocr_source` is `"mistral"` when Mistral answered and `"easyocr_fallback"` when EasyOCR's text was used instead.
 - A quality warning is attached when the engine's confidence falls below `0.5` or nothing is read (the Mistral API returns no per-word confidence, so it reports `1.0` unless the response carries page confidence scores).
@@ -262,7 +262,7 @@ pip install -r requirements.txt
 cp backend/.env.example backend/.env
 #    edit backend/.env:
 #    GROQ_API_KEY=your_groq_key_here        → enables LLM explanations
-#    MISTRAL_API_KEY=your_key_here          → optional, enables Mistral OCR (primary engine)
+#    GEMINI_API_KEY=your_key_here           → optional, enables Gemini OCR (primary engine)
 ```
 
 **Optional — regenerate the dataset:**
@@ -395,7 +395,7 @@ These are honest, code-verified constraints — not feature claims:
 ├── backend/
 │   ├── main.py            # FastAPI app — POST /predict
 │   ├── graph.py           # LangGraph orchestration + OCR engine selection + LLM explanation
-│   └── .env.example       # GROQ_API_KEY (+ optional MISTRAL_API_KEY)
+│   └── .env.example       # GROQ_API_KEY (+ optional GEMINI_API_KEY)
 ├── config/
 │   └── risk_weights.py    # fusion weights + risk thresholds
 ├── fusion/
@@ -413,7 +413,7 @@ These are honest, code-verified constraints — not feature claims:
 │   ├── data_utils.py      # names, DOB, Aadhaar/PAN number generators
 │   ├── ocr/
 │   │   ├── ocr_engine.py      # EasyOCR wrapper (en+hi, CPU) — fallback text + layout boxes
-│   │   ├── mistral_engine.py  # Mistral OCR API client (primary engine, 5s timeout)
+│   │   ├── gemini_engine.py   # Gemini OCR API client (primary engine)
 │   │   ├── preprocessing.py   # deskew / CLAHE / denoise
 │   │   └── text_normalizer.py # NFC + whitespace normalisation
 │   └── validation/

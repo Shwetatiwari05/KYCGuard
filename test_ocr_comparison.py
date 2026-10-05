@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OCR comparison script: EasyOCR vs Mistral OCR side-by-side.
+"""OCR comparison script: EasyOCR vs Gemini OCR side-by-side.
 
 Usage:
     python test_ocr_comparison.py [image_paths...]
@@ -21,7 +21,7 @@ from PIL import Image
 sys.path.insert(0, str(__file__).rsplit("/", 1)[0] if "/" in str(__file__) else ".")
 
 from src.ocr.ocr_engine import OCREngine as EasyOCREngine
-from src.ocr.mistral_engine import MistralOCREngine
+from src.ocr.gemini_engine import GeminiOCREngine
 
 DEFAULT_IMAGES = [
     "output/real/real_orig_100front_scaled_up.jpg",
@@ -49,30 +49,30 @@ def compare(image_path: str) -> None:
         print(f"  Warning: {easy_warn}")
 
     try:
-        mistral = MistralOCREngine()
+        gemini = GeminiOCREngine()
         t1 = time.perf_counter()
-        mistral_text, mistral_conf = mistral.run(arr)
-        mistral_ms = (time.perf_counter() - t1) * 1000
-        print(f"\n[Mistral]  ({mistral_ms:.0f} ms, conf={mistral_conf:.3f})")
-        print(f"  Text: {mistral_text[:500]}")
+        gemini_text, gemini_conf = gemini.run(arr)
+        gemini_ms = (time.perf_counter() - t1) * 1000
+        print(f"\n[Gemini]   ({gemini_ms:.0f} ms, conf={gemini_conf:.3f})")
+        print(f"  Text: {gemini_text[:500]}")
     except Exception as e:
-        print(f"\n[Mistral]  ERROR: {e}")
-        mistral_ms = None
-        mistral_text = ""
-        mistral_conf = 0.0
+        print(f"\n[Gemini]   ERROR: {e}")
+        gemini_ms = None
+        gemini_text = ""
+        gemini_conf = 0.0
 
     print(f"\n{'─'*70}")
     print("SIDE-BY-SIDE:")
     print(f"  EasyOCR : {easy_text[:200]}")
-    print(f"  Mistral : {mistral_text[:200] if mistral_text else '(failed)'}")
-    if mistral_ms is not None:
-        print(f"  Latency : EasyOCR={easy_ms:.0f}ms  Mistral={mistral_ms:.0f}ms  "
-              f"({'Mistral slower' if mistral_ms and mistral_ms > easy_ms * 2 else 'comparable'})")
+    print(f"  Gemini  : {gemini_text[:200] if gemini_text else '(failed)'}")
+    if gemini_ms is not None:
+        print(f"  Latency : EasyOCR={easy_ms:.0f}ms  Gemini={gemini_ms:.0f}ms  "
+              f"({'Gemini slower' if gemini_ms and gemini_ms > easy_ms * 2 else 'comparable'})")
     print(f"{'─'*70}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Compare EasyOCR vs Mistral OCR")
+    parser = argparse.ArgumentParser(description="Compare EasyOCR vs Gemini OCR")
     parser.add_argument("images", nargs="*", help="Image paths to test")
     args = parser.parse_args()
 
