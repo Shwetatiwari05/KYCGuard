@@ -101,30 +101,30 @@ KYCGuard treats forgery detection as a **multi-signal measurement problem**:
 
 ```mermaid
 flowchart TD
-    U["Frontend — vanilla JS<br/>index.html · demo.html<br/>upload · drag-drop · webcam"] -->|"POST /predict<br/>(multipart: file, doc_type)"| API["FastAPI<br/>backend/main.py"]
+    U["Frontend (vanilla JS)<br/>index.html / demo.html<br/>upload, drag-drop, webcam"] -->|"POST /predict<br/>multipart: file + doc_type"| API["FastAPI<br/>backend/main.py"]
 
-    API --> PRE["Preprocess upload<br/>RGB → resize 224×224 → ImageNet normalise<br/>+ per-channel 2-D DCT → log-scale → [0,1]"]
+    API --> PRE["Preprocess<br/>RGB, resize 224x224,<br/>ImageNet normalise<br/>+ per-channel 2-D DCT"]
     PRE --> START(["START"])
 
-    START --> VIS["run_visual_model<br/>DualBranchForgeryDetector<br/>EfficientNet-B0 ∥ DCT-CNN → fusion head<br/>visual_risk_score = P(fake)"]
-    START --> OCR["run_ocr<br/>Azure AI Vision · imageanalysis:analyze (read)<br/>text + per-word confidence + polygons<br/>normalize → extracted_text"]
+    START --> VIS["run_visual_model<br/>DualBranchForgeryDetector<br/>EfficientNet-B0 + DCT-CNN<br/>+ fusion head<br/>visual_risk_score = P_fake"]
+    START --> OCR["run_ocr<br/>Azure AI Vision read API<br/>text + word confidence<br/>+ word polygons"]
 
     VIS --> JOIN["join_signals"]
     OCR --> JOIN
 
     JOIN --> SEM["run_semantic_validation<br/>rapidfuzz header checks<br/>Aadhaar 95% / PAN 88%"]
-    JOIN --> STR["run_structural_validation<br/>Aadhaar 12-digit · PAN AAAAA9999A"]
-    JOIN --> LAY["run_layout_validation<br/>word boxes vs calibrated regions ±20%"]
+    JOIN --> STR["run_structural_validation<br/>Aadhaar 12-digit<br/>PAN AAAAA9999A"]
+    JOIN --> LAY["run_layout_validation<br/>word boxes vs regions<br/>tolerance 20%"]
 
-    SEM --> FUSE["fuse_risk<br/>0.45·visual + 0.30·semantic<br/>+ 0.15·structural + 0.10·layout<br/>hard rule: semantic ≥ 1.0 → HIGH_RISK"]
+    SEM --> FUSE["fuse_risk<br/>0.45 visual + 0.30 semantic<br/>+ 0.15 structural + 0.10 layout<br/>hard rule: semantic = 1.0"]
     STR --> FUSE
     LAY --> FUSE
 
-    FUSE --> ROUTE{"decision == APPROVE ?"}
+    FUSE --> ROUTE{"decision = APPROVE?"}
     ROUTE -->|Yes| REP["report<br/>explanation = null"]
-    ROUTE -->|No| EXP["explain<br/>Groq LLM · openai/gpt-oss-20b<br/>only if GROQ_API_KEY is set"]
-    REP --> END(["END → JSON response"])
-    EXP --> END
+    ROUTE -->|No| EXP["explain<br/>Groq LLM openai/gpt-oss-20b<br/>only if GROQ_API_KEY set"]
+    REP --> ENDNODE(["END: JSON response"])
+    EXP --> ENDNODE
 ```
 
 Graph edges are defined in `backend/graph.py`: `START` fans out to `run_visual_model` and `run_ocr`; both fan into `join_signals`; `join_signals` fans out to the three validation nodes; all three fan into `fuse_risk`; `fuse_risk` routes conditionally to `report` or `explain`, both of which end at `END`.
