@@ -13,6 +13,25 @@ def fuse(
     structural: float,
     layout: float,
 ) -> dict[str, Any]:
+    # Hard rule: mandatory semantic failure forces HIGH_RISK
+    if semantic >= 1.0:
+        category = "HIGH_RISK"
+        decision = "SUSPICIOUS"
+        final = max(
+            (
+                RISK_WEIGHTS["visual"] * visual
+                + RISK_WEIGHTS["semantic"] * semantic
+                + RISK_WEIGHTS["structural"] * structural
+                + RISK_WEIGHTS["layout"] * layout
+            ),
+            1.0,
+        )
+        return {
+            "risk_score": round(min(final, 1.0), 4),
+            "category": category,
+            "decision": decision,
+        }
+
     final = (
         RISK_WEIGHTS["visual"] * visual
         + RISK_WEIGHTS["semantic"] * semantic
