@@ -96,7 +96,7 @@
       }
       camStream = stream;
       camVideo.srcObject = stream;
-      camVideo.play().catch(() => {});
+      camVideo.play().catch(() => { });
       setCameraUI("live");
     } catch (err) {
       stopWebcam();
@@ -229,7 +229,7 @@
     formData.append("doc_type", docType);
 
     try {
-      const res = await fetch("http://localhost:8000/predict", {
+      const res = await fetch("https://kycguard.onrender.com/predict", {
         method: "POST",
         body: formData,
       });
