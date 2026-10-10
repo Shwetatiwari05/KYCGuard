@@ -229,7 +229,7 @@
     formData.append("doc_type", docType);
 
     try {
-      const res = await fetch("http://localhost:8080/predict", {
+      const res = await fetch("http://localhost:8000/predict", {
         method: "POST",
         body: formData,
       });
